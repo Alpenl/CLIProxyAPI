@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,9 +34,12 @@ func newTestServer(t *testing.T) *Server {
 		SDKConfig: sdkconfig.SDKConfig{
 			APIKeys: []string{"test-key"},
 		},
-		Port:                   0,
-		AuthDir:                authDir,
-		Debug:                  true,
+		Port:    0,
+		AuthDir: authDir,
+		Debug:   true,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			SecretKey: "test-management-key",
+		},
 		LoggingToFile:          false,
 		UsageStatisticsEnabled: false,
 	}
@@ -46,48 +51,98 @@ func newTestServer(t *testing.T) *Server {
 	return NewServer(cfg, authManager, accessManager, configPath)
 }
 
-func TestAmpProviderModelRoutes(t *testing.T) {
+func TestServerRegistersOnlyCodexRoutes(t *testing.T) {
 	testCases := []struct {
-		name         string
-		path         string
-		wantStatus   int
-		wantContains string
+		name   string
+		method string
+		path   string
+		body   io.Reader
+		headers map[string]string
+		wantAny []int
 	}{
 		{
-			name:         "openai root models",
-			path:         "/api/provider/openai/models",
-			wantStatus:   http.StatusOK,
-			wantContains: `"object":"list"`,
+			name:   "models endpoint exists",
+			method: http.MethodGet,
+			path:   "/v1/models",
+			wantAny: []int{http.StatusUnauthorized, http.StatusOK},
 		},
 		{
-			name:         "groq root models",
-			path:         "/api/provider/groq/models",
-			wantStatus:   http.StatusOK,
-			wantContains: `"object":"list"`,
+			name:   "chat completions endpoint exists",
+			method: http.MethodPost,
+			path:   "/v1/chat/completions",
+			body:   bytes.NewBufferString(`{}`),
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			wantAny: []int{http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
 		},
 		{
-			name:         "openai models",
-			path:         "/api/provider/openai/v1/models",
-			wantStatus:   http.StatusOK,
-			wantContains: `"object":"list"`,
+			name:   "completions endpoint exists",
+			method: http.MethodPost,
+			path:   "/v1/completions",
+			body:   bytes.NewBufferString(`{}`),
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			wantAny: []int{http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
 		},
 		{
-			name:         "anthropic models",
-			path:         "/api/provider/anthropic/v1/models",
-			wantStatus:   http.StatusOK,
-			wantContains: `"data"`,
+			name:   "responses endpoint exists",
+			method: http.MethodPost,
+			path:   "/v1/responses",
+			body:   bytes.NewBufferString(`{}`),
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			wantAny: []int{http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
 		},
 		{
-			name:         "google models v1",
-			path:         "/api/provider/google/v1/models",
-			wantStatus:   http.StatusOK,
-			wantContains: `"models"`,
+			name:   "usage management endpoint exists",
+			method: http.MethodGet,
+			path:   "/v0/management/usage",
+			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusOK},
 		},
 		{
-			name:         "google models v1beta",
-			path:         "/api/provider/google/v1beta/models",
-			wantStatus:   http.StatusOK,
-			wantContains: `"models"`,
+			name:   "codex accounts endpoint exists",
+			method: http.MethodGet,
+			path:   "/v0/management/codex/accounts",
+			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusOK},
+		},
+		{
+			name:   "codex import directory endpoint exists",
+			method: http.MethodPost,
+			path:   "/v0/management/codex/import-directory",
+			body:   bytes.NewBufferString(`{}`),
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
+		},
+		{
+			name:   "codex import files endpoint exists",
+			method: http.MethodPost,
+			path:   "/v0/management/codex/import-files",
+			body:   bytes.NewBufferString(""),
+			headers: map[string]string{
+				"Content-Type": "multipart/form-data; boundary=test",
+			},
+			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
+		},
+		{
+			name:   "codex cleanup endpoint exists",
+			method: http.MethodPost,
+			path:   "/v0/management/codex/cleanup-invalid",
+			body:   bytes.NewBufferString(`{}`),
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusOK},
+		},
+		{
+			name:   "codex delete endpoint exists",
+			method: http.MethodDelete,
+			path:   "/v0/management/codex/accounts/example.json",
+			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
 		},
 	}
 
@@ -96,17 +151,52 @@ func TestAmpProviderModelRoutes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			server := newTestServer(t)
 
-			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
-			req.Header.Set("Authorization", "Bearer test-key")
+			req := httptest.NewRequest(tc.method, tc.path, tc.body)
+			for key, value := range tc.headers {
+				req.Header.Set(key, value)
+			}
 
 			rr := httptest.NewRecorder()
 			server.engine.ServeHTTP(rr, req)
 
-			if rr.Code != tc.wantStatus {
-				t.Fatalf("unexpected status code for %s: got %d want %d; body=%s", tc.path, rr.Code, tc.wantStatus, rr.Body.String())
+			for _, code := range tc.wantAny {
+				if rr.Code == code {
+					return
+				}
 			}
-			if body := rr.Body.String(); !strings.Contains(body, tc.wantContains) {
-				t.Fatalf("response body for %s missing %q: %s", tc.path, tc.wantContains, body)
+			t.Fatalf("unexpected status code for %s %s: got %d want one of %v; body=%s", tc.method, tc.path, rr.Code, tc.wantAny, rr.Body.String())
+		})
+	}
+}
+
+func TestServerRemovesLegacyRoutes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{name: "claude messages removed", method: http.MethodPost, path: "/v1/messages"},
+		{name: "claude count tokens removed", method: http.MethodPost, path: "/v1/messages/count_tokens"},
+		{name: "gemini beta models removed", method: http.MethodGet, path: "/v1beta/models"},
+		{name: "amp provider route removed", method: http.MethodGet, path: "/api/provider/openai/models"},
+		{name: "anthropic callback removed", method: http.MethodGet, path: "/anthropic/callback"},
+		{name: "google callback removed", method: http.MethodGet, path: "/google/callback"},
+		{name: "iflow callback removed", method: http.MethodGet, path: "/iflow/callback"},
+		{name: "antigravity callback removed", method: http.MethodGet, path: "/antigravity/callback"},
+		{name: "oauth callback relay removed", method: http.MethodPost, path: "/v0/management/oauth-callback"},
+		{name: "qwen auth url removed", method: http.MethodGet, path: "/v0/management/qwen-auth-url"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			server := newTestServer(t)
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			rr := httptest.NewRecorder()
+			server.engine.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusNotFound {
+				t.Fatalf("expected %s %s to be removed with status %d, got %d: %s", tc.method, tc.path, http.StatusNotFound, rr.Code, rr.Body.String())
 			}
 		})
 	}

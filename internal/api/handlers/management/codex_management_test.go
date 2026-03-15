@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -37,6 +38,7 @@ func newCodexManagementRouter(h *Handler) *gin.Engine {
 	router := gin.New()
 	router.GET("/v0/management/codex/accounts", h.ListCodexAccounts)
 	router.POST("/v0/management/codex/import-directory", h.ImportCodexDirectory)
+	router.POST("/v0/management/codex/import-files", h.ImportCodexFiles)
 	router.POST("/v0/management/codex/cleanup-invalid", h.CleanupInvalidCodexAccounts)
 	router.DELETE("/v0/management/codex/accounts/:name", h.DeleteCodexAccount)
 	return router
@@ -147,6 +149,56 @@ func TestCodexManagementImportDirectory_ImportsValidCodexFiles(t *testing.T) {
 	}
 	if got := auths[0].Provider; got != "codex" {
 		t.Fatalf("expected registered provider codex, got %s", got)
+	}
+}
+
+func TestCodexManagementImportFiles_ImportsUploadedCodexFiles(t *testing.T) {
+	handler, manager, authDir := newCodexManagementTestHandler(t)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	if err := writer.WriteField("cleanup_invalid", "false"); err != nil {
+		t.Fatalf("failed to write cleanup flag: %v", err)
+	}
+
+	fileWriter, err := writer.CreateFormFile("files", "codex-upload.json")
+	if err != nil {
+		t.Fatalf("failed to create multipart file: %v", err)
+	}
+	if _, err = fileWriter.Write([]byte(`{"type":"codex","email":"upload@example.com","refresh_token":"refresh-upload","access_token":"access-upload"}`)); err != nil {
+		t.Fatalf("failed to write multipart file: %v", err)
+	}
+	if err = writer.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
+
+	router := newCodexManagementRouter(handler)
+	req := httptest.NewRequest(http.MethodPost, "/v0/management/codex/import-files", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	payload := decodeJSONBody(t, rr)
+	if got := int(payload["imported"].(float64)); got != 1 {
+		t.Fatalf("expected 1 imported account, got %d", got)
+	}
+
+	importedPath := filepath.Join(authDir, "codex-upload.json")
+	if _, err = os.Stat(importedPath); err != nil {
+		t.Fatalf("expected imported file at %s: %v", importedPath, err)
+	}
+
+	auths := manager.List()
+	if len(auths) != 1 {
+		t.Fatalf("expected 1 registered auth, got %d", len(auths))
+	}
+	if got := auths[0].FileName; got != "codex-upload.json" {
+		t.Fatalf("expected uploaded auth file name codex-upload.json, got %s", got)
 	}
 }
 
