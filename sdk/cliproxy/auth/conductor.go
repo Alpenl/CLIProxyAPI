@@ -849,6 +849,30 @@ func (m *Manager) Update(ctx context.Context, auth *Auth) (*Auth, error) {
 	return auth.Clone(), nil
 }
 
+// Remove deletes an auth entry from the manager's in-memory state and scheduler.
+// Persistence is intentionally handled by the caller because some flows remove the
+// backing credential file before cleaning up runtime state.
+func (m *Manager) Remove(id string) {
+	if m == nil {
+		return
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+
+	m.mu.Lock()
+	delete(m.auths, id)
+	delete(m.modelPoolOffsets, id)
+	m.mu.Unlock()
+
+	m.rebuildAPIKeyModelAliasFromRuntimeConfig()
+	if m.scheduler != nil {
+		m.scheduler.removeAuth(id)
+	}
+	registry.GetGlobalRegistry().UnregisterClient(id)
+}
+
 // Load resets manager state from the backing store.
 func (m *Manager) Load(ctx context.Context) error {
 	m.mu.Lock()

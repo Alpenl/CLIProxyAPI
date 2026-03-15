@@ -60,6 +60,26 @@ GLM CODING PLAN 是专为AI编码打造的订阅套餐，每月最低仅需20元
 
 CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
 
+## Codex 精简控制台
+
+本分支默认推荐把 CLIProxyAPI 当作一个 `Codex-only` 代理来使用：
+
+- 使用 [config.example.yaml](config.example.yaml) 里的最小配置启动服务
+- 访问 `http://127.0.0.1:8317/management.html`
+- 输入 `remote-management.secret-key` 的明文密钥
+- 在控制台里直接导入服务器目录，例如 `/home/alpen/DEV/cdx-rt/output`
+- 或批量上传本地导出的 `codex-*.json`
+- 点击 `Clear invalid` 清理失效账号；目录导入时也可勾选自动清理
+
+这个控制台只保留 Codex 账号池相关操作：
+
+- 查看当前账号列表、计划类型、最近刷新时间
+- 批量导入 Codex 账号文件
+- 自动清理 refresh 失败或缺少 refresh token 的账号
+- 删除单个本地账号文件
+
+不再依赖外部下载的 Web 面板资源，`/management.html` 直接由二进制内嵌提供。
+
 ## 管理 API 文档
 
 请参见 [MANAGEMENT_API_CN.md](https://help.router-for.me/cn/management/api)

@@ -1,0 +1,2882 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex 控制台</title>
+    <style>
+      :root {
+        --bg: #f3f5f7;
+        --bg-soft: #fafbfc;
+        --panel: #ffffff;
+        --line: #e6eaef;
+        --line-strong: #d9dfe7;
+        --text: #111111;
+        --text-soft: #2f3640;
+        --muted: #6b7280;
+        --muted-light: #98a1ae;
+        --accent: #16a34a;
+        --accent-soft: #edf9f0;
+        --warn: #d97706;
+        --warn-soft: #fff7ed;
+        --danger: #dc2626;
+        --danger-soft: #fef2f2;
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        --radius-lg: 10px;
+        --radius-md: 8px;
+        --radius-sm: 6px;
+        --mono: "IBM Plex Mono", "SFMono-Regular", "Cascadia Mono", monospace;
+        --sans: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      html {
+        scrollbar-gutter: stable both-edges;
+      }
+
+      body {
+        font-family: var(--sans);
+        color: var(--text);
+        background: linear-gradient(180deg, #f7f8fa 0%, #f1f4f6 100%);
+        overflow-y: scroll;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.18);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.16s ease;
+        z-index: 20;
+      }
+
+      body.nav-open .drawer-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .auth-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px 16px;
+      }
+
+      .auth-panel {
+        width: min(428px, 100%);
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: var(--shadow);
+        display: grid;
+        gap: 18px;
+      }
+
+      .auth-copy {
+        display: grid;
+        gap: 8px;
+      }
+
+      .auth-title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+      }
+
+      .auth-description {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .auth-form {
+        display: grid;
+        gap: 12px;
+      }
+
+      .auth-status {
+        min-height: 42px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--bg-soft);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .auth-status.ok {
+        color: #15803d;
+        border-color: #d8f7e4;
+        background: var(--accent-soft);
+      }
+
+      .auth-status.warn {
+        color: #b45309;
+        border-color: #fde3c1;
+        background: var(--warn-soft);
+      }
+
+      .auth-status.bad {
+        color: #b91c1c;
+        border-color: #fecaca;
+        background: var(--danger-soft);
+      }
+
+      .backend-shell {
+        width: 100%;
+        min-height: 100vh;
+        padding: 10px 0 14px;
+      }
+
+      .app-shell {
+        width: min(1560px, calc(100% - 20px));
+        min-height: calc(100vh - 24px);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 188px minmax(0, 1fr);
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .sidebar,
+      .panel,
+      .stat-card,
+      .table-shell,
+      .empty-box {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 10px;
+        height: 100%;
+        padding: 10px;
+        border-radius: var(--radius-lg);
+        display: grid;
+        align-content: start;
+        gap: 8px;
+      }
+
+      .brand {
+        display: grid;
+        gap: 4px;
+      }
+
+      .brand-kicker,
+      .section-kicker,
+      .stat-label,
+      .field-label,
+      th {
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+
+      .brand-title {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.035em;
+      }
+
+      .brand-note,
+      .helper,
+      .meta-note,
+      .empty-box,
+      .subtle {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.65;
+      }
+
+      .nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .nav-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 34px;
+        padding: 0 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+        color: var(--text-soft);
+        font-size: 13px;
+      }
+
+      .nav-link:hover {
+        background: var(--bg-soft);
+        border-color: var(--line);
+      }
+
+      .nav-link.active {
+        color: #166534;
+        background: var(--accent-soft);
+        border-color: #d8efdf;
+        font-weight: 600;
+      }
+
+      .sidebar-group {
+        padding: 10px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--line);
+        background: var(--bg-soft);
+        display: grid;
+        gap: 8px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .section-head h2,
+      .panel h3,
+      .table-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .status-pill,
+      .status-dot-pill,
+      .plan-pill,
+      .small-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 24px;
+        padding: 0 8px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text-soft);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .status-pill.ok,
+      .status-dot-pill.ok {
+        color: #15803d;
+        background: var(--accent-soft);
+        border-color: #d8f7e4;
+      }
+
+      .status-pill.warn,
+      .status-dot-pill.warn {
+        color: #b45309;
+        background: var(--warn-soft);
+        border-color: #fde3c1;
+      }
+
+      .status-pill.bad,
+      .status-dot-pill.bad {
+        color: #b91c1c;
+        background: var(--danger-soft);
+        border-color: #fecaca;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      input[type="text"],
+      input[type="password"] {
+        width: 100%;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: #fff;
+        color: var(--text);
+        outline: none;
+      }
+
+      select {
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: #fff;
+        color: var(--text);
+        outline: none;
+      }
+
+      input[type="text"]:focus,
+      input[type="password"]:focus {
+        border-color: #9ed9b4;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+      }
+
+      input[type="file"] {
+        width: 100%;
+        color: var(--muted);
+      }
+
+      .visually-hidden-file {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .switch-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text-soft);
+        font-size: 13px;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .button {
+        min-height: 32px;
+        padding: 0 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .button-primary {
+        background: #111827;
+        border-color: #111827;
+        color: #fff;
+      }
+
+      .button-primary:hover {
+        background: #0f172a;
+      }
+
+      .button-secondary {
+        background: #fff;
+        border-color: var(--line-strong);
+        color: var(--text);
+      }
+
+      .button-secondary:hover {
+        background: #f8fafc;
+      }
+
+      .button-danger {
+        background: #fff;
+        border-color: #f4c2c2;
+        color: var(--danger);
+      }
+
+      .button-danger:hover {
+        background: #fff7f7;
+      }
+
+      .main-shell {
+        min-height: calc(100vh - 24px);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .page-header {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+
+      .page-header-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .page-header-main {
+        min-width: 0;
+        display: flex;
+        gap: 10px;
+        align-items: start;
+      }
+
+      .page-header-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .page-title {
+        margin: 1px 0 0;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+      }
+
+      .page-description {
+        margin: 4px 0 0;
+        max-width: 620px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .mobile-menu {
+        display: none;
+      }
+
+      .page-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+        align-self: start;
+      }
+
+      .view {
+        display: grid;
+        gap: 10px;
+        min-height: 0;
+        align-content: start;
+      }
+
+      .view[data-route="dashboard"] {
+        grid-auto-rows: max-content;
+      }
+
+      .view[data-route="quota"] {
+        grid-template-rows: minmax(0, 1fr);
+      }
+
+      .view[data-route="import"] {
+        grid-template-rows: auto minmax(180px, 1fr) minmax(180px, 1fr);
+      }
+
+      .view[data-route="logs"] {
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .view[data-route="import"] > .table-shell,
+      .view[data-route="logs"] > .table-shell {
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .view[data-route="quota"] > .table-shell {
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .view[data-route="quota"] .table-wrap,
+      .view[data-route="import"] .table-wrap,
+      .view[data-route="logs"] .table-wrap,
+      .view[data-route="quota"] .empty-box,
+      .view[data-route="import"] .empty-box,
+      .view[data-route="logs"] .empty-box {
+        min-height: 0;
+      }
+
+      .view[data-route="quota"] > .table-shell > .table-wrap,
+      .view[data-route="quota"] > .table-shell > .empty-box,
+      .view[data-route="import"] > .table-shell > .table-wrap,
+      .view[data-route="import"] > .table-shell > .empty-box,
+      .view[data-route="logs"] > .table-shell > .table-wrap,
+      .view[data-route="logs"] > .table-shell > .empty-box {
+        height: 100%;
+      }
+
+      .grid-4,
+      .grid-2 {
+        display: grid;
+        gap: 8px;
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .panel,
+      .table-shell,
+      .empty-box {
+        border-radius: var(--radius-md);
+      }
+
+      .panel,
+      .table-shell {
+        padding: 10px;
+      }
+
+      .stat-card {
+        padding: 10px;
+        border-radius: var(--radius-md);
+      }
+
+      .stat-value {
+        margin-top: 4px;
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+      }
+
+      .stat-value.small {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .summary-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .table-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+
+      .quota-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+        align-items: start;
+      }
+
+      .quota-head-copy {
+        min-width: 0;
+      }
+
+      .quota-toolbar-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 152px;
+        gap: 8px;
+        align-items: end;
+      }
+
+      .toolbar-cell {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .toolbar-cell.search {
+        min-width: 0;
+      }
+
+      .toolbar-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+      }
+
+      .quota-table {
+        table-layout: fixed;
+        min-width: 0;
+      }
+
+      .quota-table th,
+      .quota-table td {
+        text-align: center;
+        vertical-align: middle;
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #fbfcfd;
+        font-weight: 600;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+
+      td {
+        color: var(--text-soft);
+        font-size: 12.5px;
+        line-height: 1.5;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      .row-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.35;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row-subtitle {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10.5px;
+        line-height: 1.45;
+        min-height: 30px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        word-break: break-word;
+      }
+
+      .quota-stack {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .quota-table .quota-stack {
+        width: 100%;
+        justify-items: stretch;
+        align-items: center;
+      }
+
+      .quota-inline-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        min-width: 0;
+        align-items: stretch;
+      }
+
+      .quota-inline-grid.single {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .quota-table td.quota-cell {
+        text-align: left;
+      }
+
+      .quota-meter {
+        display: grid;
+        gap: 6px;
+        min-height: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .quota-meter-top {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .quota-meter-top strong {
+        color: var(--text);
+        font-size: 16px;
+        line-height: 1;
+        letter-spacing: -0.04em;
+      }
+
+      .quota-meter-time {
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: right;
+        font-family: var(--mono);
+        color: var(--text-soft);
+        font-size: 11px;
+      }
+
+      .quota-meter-unit {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .quota-track {
+        height: 6px;
+        border-radius: 999px;
+        background: #eceff3;
+        overflow: hidden;
+      }
+
+      .quota-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      .quota-fill.high {
+        background: #22c55e;
+      }
+
+      .quota-fill.medium {
+        background: #84cc16;
+      }
+
+      .quota-fill.low {
+        background: #d97706;
+      }
+
+      .quota-placeholder,
+      .cell-message {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        background: #fbfcfd;
+      }
+
+      .quota-table-wrap {
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .plan-pill.compact,
+      .status-pill.compact {
+        min-height: 22px;
+        padding: 0 7px;
+        font-size: 10.5px;
+      }
+
+      .cell-message.error {
+        color: var(--danger);
+        border-color: #f5c2c2;
+        background: #fff7f7;
+      }
+
+      .quota-note {
+        color: var(--muted);
+        font-size: 10.5px;
+        line-height: 1.45;
+      }
+
+      .quota-note.warn {
+        color: var(--warn);
+      }
+
+      .quota-note.bad {
+        color: var(--danger);
+      }
+
+      .actions-col {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        min-width: 108px;
+        margin: 0 auto;
+      }
+
+      .actions-col .button {
+        min-height: 28px;
+        width: 100%;
+        padding: 0 8px;
+        font-size: 11px;
+      }
+
+      .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .quota-table .row-title,
+      .quota-table .row-subtitle {
+        text-align: center;
+      }
+
+      .file-picker {
+        display: grid;
+        gap: 6px;
+      }
+
+      .file-picker-row,
+      .file-picker-grid {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+      }
+
+      .file-picker-summary {
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        border: 1px dashed var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: #fbfcfd;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .log-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .log-item {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: #fff;
+        padding: 10px 12px;
+      }
+
+      .log-item time {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        font-family: var(--mono);
+      }
+
+      .log-item p {
+        margin: 6px 0 0;
+        color: var(--text-soft);
+        font-size: 13px;
+        line-height: 1.65;
+        word-break: break-word;
+      }
+
+      .log-item.error {
+        border-color: #fecaca;
+        background: var(--danger-soft);
+      }
+
+      .log-item.warn {
+        border-color: #fed7aa;
+        background: var(--warn-soft);
+      }
+
+      .empty-box {
+        padding: 18px;
+        text-align: center;
+      }
+
+      .inline-link {
+        color: #15803d;
+        font-size: 12px;
+      }
+
+      .mono {
+        font-family: var(--mono);
+      }
+
+      .overview-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .overview-row {
+        min-height: 36px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: #fff;
+      }
+
+      .overview-label {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .overview-value {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        text-align: right;
+      }
+
+      .overview-value.sync {
+        font-size: 11px;
+        line-height: 1.45;
+        letter-spacing: 0;
+        color: var(--text-soft);
+      }
+
+      .quick-note {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+        padding-top: 2px;
+      }
+
+      @media (max-width: 1200px) {
+        .grid-4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 980px) {
+        .app-shell {
+          width: min(calc(100% - 16px), 100%);
+          margin: 8px auto 16px;
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: fixed;
+          inset: 8px auto 8px 8px;
+          width: min(228px, calc(100vw - 32px));
+          max-height: calc(100vh - 16px);
+          overflow: auto;
+          transform: translateX(calc(-100% - 24px));
+          transition: transform 0.16s ease;
+          z-index: 30;
+        }
+
+        body.nav-open .sidebar {
+          transform: translateX(0);
+        }
+
+        .mobile-menu {
+          display: inline-flex;
+        }
+
+        .main-shell {
+          min-height: auto;
+        }
+
+        .page-header-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .page-actions {
+          justify-content: flex-start;
+        }
+
+        .quota-head {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .grid-4,
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .quota-toolbar-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .file-picker-row,
+        .file-picker-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .table-wrap {
+          border-radius: 10px;
+        }
+
+        .main-shell,
+        .sidebar,
+        .panel,
+        .table-shell,
+        .empty-box,
+        .stat-card {
+          padding-left: 10px;
+          padding-right: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="auth-shell" id="auth-shell">
+      <section class="auth-panel">
+        <div class="auth-copy">
+          <div class="section-kicker">Codex 专用代理</div>
+          <h1 class="auth-title">管理登录</h1>
+          <p class="auth-description">管理密钥只在登录页输入一次。验证通过后自动进入后台，并仅保存在当前浏览器中。</p>
+        </div>
+
+        <form class="auth-form" id="auth-form">
+          <label class="field">
+            <span class="field-label">管理密钥</span>
+            <input id="auth-management-key" type="password" placeholder="请输入管理接口密钥" autocomplete="current-password" />
+          </label>
+          <div class="button-row">
+            <button class="button button-primary" id="auth-submit" type="submit">进入后台</button>
+            <button class="button button-secondary" id="auth-clear" type="button">清除已保存密钥</button>
+          </div>
+        </form>
+
+        <div class="auth-status" id="auth-status">输入一次管理密钥后会保存在当前浏览器，下次会自动尝试进入后台。</div>
+      </section>
+    </section>
+
+    <section class="backend-shell" id="backend-shell" hidden>
+      <div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+      <div class="app-shell">
+        <aside class="sidebar">
+          <section class="brand">
+            <div class="brand-kicker">Codex 专用代理</div>
+            <div class="brand-title">Codex 控制台</div>
+            <div class="brand-note">只保留账号、额度、导入和清理四类高频操作。</div>
+          </section>
+
+          <nav class="nav" aria-label="主导航">
+            <a class="nav-link" data-route-link="dashboard" href="#/dashboard">仪表盘</a>
+            <a class="nav-link" data-route-link="quota" href="#/quota">账号额度</a>
+            <a class="nav-link" data-route-link="import" href="#/import">账号导入</a>
+            <a class="nav-link" data-route-link="logs" href="#/logs">操作日志</a>
+          </nav>
+
+          <section class="sidebar-group">
+            <div class="section-head">
+              <h2>当前概览</h2>
+            </div>
+            <div class="overview-list">
+              <div class="overview-row">
+                <div class="overview-label">账号数量</div>
+                <div class="overview-value" id="quick-accounts">0</div>
+              </div>
+              <div class="overview-row">
+                <div class="overview-label">可用账号</div>
+                <div class="overview-value" id="quick-enabled">0</div>
+              </div>
+              <div class="overview-row">
+                <div class="overview-label">累计请求</div>
+                <div class="overview-value" id="quick-requests">0</div>
+              </div>
+              <div class="overview-row">
+                <div class="overview-label">最近同步</div>
+                <div class="overview-value sync" id="quick-sync">未同步</div>
+              </div>
+              <div class="quick-note">这里保留最核心的运行数字，详细用量和操作结果在各自页面展开。</div>
+            </div>
+          </section>
+        </aside>
+
+        <section class="main-shell">
+          <header class="page-header page-header-grid">
+            <div class="page-header-main">
+              <button class="button button-secondary mobile-menu" id="mobile-menu" type="button">菜单</button>
+              <div class="page-header-copy">
+                <div class="section-kicker">运营控制台</div>
+                <h1 class="page-title" id="page-title">仪表盘</h1>
+                <p class="page-description" id="page-description">查看账号池概况、请求用量和最近操作。</p>
+              </div>
+            </div>
+            <div class="page-actions">
+              <button class="button button-secondary" data-action="refresh-overview" type="button">手动刷新</button>
+              <button class="button button-danger" data-action="cleanup-invalid" type="button">清理失效账号</button>
+            </div>
+          </header>
+
+          <main class="view" id="view"></main>
+        </section>
+      </div>
+    </section>
+
+    <script>
+      const STORAGE_KEY = "codex-console.management-key";
+      const IMPORT_PATH_KEY = "codex-console.import-path";
+      const AUTO_CLEANUP_KEY = "codex-console.auto-cleanup";
+      const DEFAULT_IMPORT_PATH = "/home/alpen/DEV/cdx-rt/output";
+      const QUOTA_AUTO_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+
+      const ROUTES = {
+        dashboard: {
+          title: "仪表盘",
+          description: "查看账号池概况、请求用量和最近操作。",
+        },
+        quota: {
+          title: "账号额度",
+          description: "按账号扫描状态、套餐和 5H / 7D 可用额度。",
+        },
+        import: {
+          title: "账号导入",
+          description: "批量导入本地导出的 Codex 账号文件，并查看导入和清理结果。",
+        },
+        logs: {
+          title: "操作日志",
+          description: "集中查看本地操作记录，追踪导入、清理、删除和刷新行为。",
+        },
+      };
+
+      const state = {
+        key: localStorage.getItem(STORAGE_KEY) || "",
+        authenticated: false,
+        authChecking: false,
+        authError: "",
+        importPath: localStorage.getItem(IMPORT_PATH_KEY) || DEFAULT_IMPORT_PATH,
+        autoCleanup: localStorage.getItem(AUTO_CLEANUP_KEY) !== "false",
+        quotaQuery: "",
+        quotaStatusFilter: "all",
+        accounts: [],
+        quotaByAccount: {},
+        usage: null,
+        lastSync: "",
+        lastImportResult: null,
+        lastCleanupResult: null,
+        logs: [],
+        quotaRefreshInFlight: false,
+        quotaAutoRefreshHandle: 0,
+        quotaLastBulkRefreshAt: 0,
+        busy: false,
+      };
+
+      const elements = {
+        body: document.body,
+        authShell: document.getElementById("auth-shell"),
+        backendShell: document.getElementById("backend-shell"),
+        authForm: document.getElementById("auth-form"),
+        authKeyInput: document.getElementById("auth-management-key"),
+        authSubmit: document.getElementById("auth-submit"),
+        authClear: document.getElementById("auth-clear"),
+        authStatus: document.getElementById("auth-status"),
+        view: document.getElementById("view"),
+        quickAccounts: document.getElementById("quick-accounts"),
+        quickEnabled: document.getElementById("quick-enabled"),
+        quickRequests: document.getElementById("quick-requests"),
+        quickSync: document.getElementById("quick-sync"),
+        pageTitle: document.getElementById("page-title"),
+        pageDescription: document.getElementById("page-description"),
+        navLinks: Array.from(document.querySelectorAll("[data-route-link]")),
+      };
+
+      function getRoute() {
+        const route = String(window.location.hash || "").replace(/^#\/?/, "").trim();
+        return ROUTES[route] ? route : "dashboard";
+      }
+
+      function ensureRoute() {
+        const route = getRoute();
+        if (window.location.hash !== `#/${route}`) {
+          window.location.replace(`#/${route}`);
+        }
+      }
+
+      function escapeHTML(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          "\"": "&quot;",
+          "'": "&#39;",
+        }[char]));
+      }
+
+      function formatCount(value) {
+        const number = Number(value || 0);
+        return Number.isFinite(number) ? number.toLocaleString("zh-CN") : "0";
+      }
+
+      function formatTime(value) {
+        if (!value) return "未同步";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function formatRelativeTime(value) {
+        if (!value) return "未同步";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        const diff = Date.now() - date.getTime();
+        const minute = 60 * 1000;
+        const hour = 60 * minute;
+        const day = 24 * hour;
+        if (diff < minute) return "刚刚";
+        if (diff < hour) return `${Math.max(1, Math.floor(diff / minute))} 分钟前`;
+        if (diff < day) return `${Math.max(1, Math.floor(diff / hour))} 小时前`;
+        return `${Math.max(1, Math.floor(diff / day))} 天前`;
+      }
+
+      function normalizeString(value) {
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          return trimmed || null;
+        }
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return String(value);
+        }
+        return null;
+      }
+
+      function normalizeNumber(value) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          if (!trimmed) return null;
+          const parsed = Number(trimmed);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      }
+
+      function normalizePlanType(value) {
+        const normalized = normalizeString(value);
+        return normalized ? normalized.toLowerCase() : null;
+      }
+
+      function resolvePlanLabel(value) {
+        const normalized = normalizePlanType(value);
+        if (normalized === "free") return "free";
+        if (normalized === "plus") return "plus";
+        if (normalized === "team") return "team";
+        return normalizeString(value) || "--";
+      }
+
+      function resolveCodexAccountId(account) {
+        return normalizeString(account && account.id_token && account.id_token.chatgpt_account_id);
+      }
+
+      function parseJSONValue(value) {
+        if (value == null) return null;
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          if (!trimmed) return null;
+          try {
+            return JSON.parse(trimmed);
+          } catch (error) {
+            return value;
+          }
+        }
+        return value;
+      }
+
+      function getAPICallErrorMessage(result) {
+        const statusCode = Number(result && (result.status_code || result.statusCode) || 0);
+        const parsedBody = parseJSONValue(result && result.body);
+        let message = "";
+
+        if (parsedBody && typeof parsedBody === "object") {
+          if (parsedBody.error && typeof parsedBody.error === "object" && typeof parsedBody.error.message === "string") {
+            message = parsedBody.error.message;
+          } else if (typeof parsedBody.error === "string") {
+            message = parsedBody.error;
+          } else if (typeof parsedBody.message === "string") {
+            message = parsedBody.message;
+          }
+        } else if (typeof parsedBody === "string") {
+          message = parsedBody.trim();
+        }
+
+        if (!message && typeof result.body === "string") {
+          message = result.body.trim();
+        }
+        if (statusCode && message) {
+          return `${statusCode} ${message}`.trim();
+        }
+        if (statusCode) {
+          return `HTTP ${statusCode}`;
+        }
+        return message || "请求失败";
+      }
+
+      function formatQuotaResetLabel(window) {
+        if (!window || typeof window !== "object") return "--";
+
+        const resetAt = normalizeNumber(window.reset_at || window.resetAt);
+        if (resetAt !== null) {
+          const date = new Date(resetAt * 1000);
+          if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleString("zh-CN", {
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            });
+          }
+        }
+
+        const resetAfterSeconds = normalizeNumber(window.reset_after_seconds || window.resetAfterSeconds);
+        if (resetAfterSeconds !== null) {
+          const date = new Date(Date.now() + resetAfterSeconds * 1000);
+          if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleString("zh-CN", {
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            });
+          }
+        }
+
+        return "--";
+      }
+
+      function quotaFillClass(percent) {
+        if (percent >= 80) return "high";
+        if (percent >= 50) return "medium";
+        return "low";
+      }
+
+      function getWindowSeconds(window) {
+        if (!window || typeof window !== "object") return null;
+        return normalizeNumber(window.limit_window_seconds || window.limitWindowSeconds);
+      }
+
+      function classifyCodexWindows(limitInfo, planType) {
+        const primaryWindow = limitInfo && (limitInfo.primary_window || limitInfo.primaryWindow) || null;
+        const secondaryWindow = limitInfo && (limitInfo.secondary_window || limitInfo.secondaryWindow) || null;
+        const rawWindows = [primaryWindow, secondaryWindow];
+        const fiveHourSeconds = 18000;
+        const weeklySeconds = 604800;
+        const supportsFiveHour = planType !== "free";
+
+        let fiveHourWindow = null;
+        let weeklyWindow = null;
+        for (const window of rawWindows) {
+          if (!window) continue;
+          const seconds = getWindowSeconds(window);
+          if (seconds === fiveHourSeconds && !fiveHourWindow) {
+            fiveHourWindow = window;
+          } else if (seconds === weeklySeconds && !weeklyWindow) {
+            weeklyWindow = window;
+          }
+        }
+
+        if (!fiveHourWindow && !weeklyWindow) {
+          if (supportsFiveHour) {
+            fiveHourWindow = primaryWindow || null;
+            weeklyWindow = secondaryWindow || null;
+          } else {
+            weeklyWindow = primaryWindow || secondaryWindow || null;
+          }
+        }
+
+        if (!supportsFiveHour) {
+          fiveHourWindow = null;
+        }
+
+        return { fiveHourWindow, weeklyWindow };
+      }
+
+      function buildCodexQuotaWindows(payload, planType) {
+        const windows = [];
+        const addWindow = (group, id, label, window, limitReached, allowed) => {
+          if (!window) return;
+          const usedPercentRaw = normalizeNumber(window.used_percent || window.usedPercent);
+          const exhausted = Boolean(limitReached) || allowed === false;
+          const usedPercent = usedPercentRaw !== null ? usedPercentRaw : exhausted ? 100 : null;
+          windows.push({
+            group,
+            id,
+            label,
+            usedPercent,
+            resetLabel: formatQuotaResetLabel(window),
+          });
+        };
+
+        const rateLimit = payload && (payload.rate_limit || payload.rateLimit) || null;
+        const codeReviewLimit = payload && (payload.code_review_rate_limit || payload.codeReviewRateLimit) || null;
+
+        const rateWindows = classifyCodexWindows(rateLimit, planType);
+        addWindow("rate", "primary", "5 小时", rateWindows.fiveHourWindow, rateLimit && (rateLimit.limit_reached || rateLimit.limitReached), rateLimit && rateLimit.allowed);
+        addWindow("rate", "weekly", "7 天", rateWindows.weeklyWindow, rateLimit && (rateLimit.limit_reached || rateLimit.limitReached), rateLimit && rateLimit.allowed);
+
+        const reviewWindows = classifyCodexWindows(codeReviewLimit, planType);
+        addWindow("review", "code-review-primary", "5 小时", reviewWindows.fiveHourWindow, codeReviewLimit && (codeReviewLimit.limit_reached || codeReviewLimit.limitReached), codeReviewLimit && codeReviewLimit.allowed);
+        addWindow("review", "code-review-weekly", "7 天", reviewWindows.weeklyWindow, codeReviewLimit && (codeReviewLimit.limit_reached || codeReviewLimit.limitReached), codeReviewLimit && codeReviewLimit.allowed);
+
+        return windows;
+      }
+
+      async function fetchCodexQuota(account) {
+        const authIndex = normalizeString(account && account.auth_index);
+        if (!authIndex) {
+          throw new Error("认证文件缺少 auth_index");
+        }
+        const accountId = resolveCodexAccountId(account);
+        if (!accountId) {
+          throw new Error("Codex 凭证缺少 ChatGPT 账号 ID");
+        }
+
+        const result = await api("/v0/management/api-call", {
+          method: "POST",
+          body: JSON.stringify({
+            auth_index: authIndex,
+            method: "GET",
+            url: "https://chatgpt.com/backend-api/wham/usage",
+            header: {
+              Authorization: "Bearer $TOKEN$",
+              "Content-Type": "application/json",
+              "User-Agent": "codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal",
+              "Chatgpt-Account-Id": accountId,
+            },
+          }),
+        });
+
+        const statusCode = Number(result.status_code || result.statusCode || 0);
+        if (statusCode < 200 || statusCode >= 300) {
+          throw new Error(getAPICallErrorMessage(result));
+        }
+
+        const payload = parseJSONValue(result.body);
+        if (!payload || typeof payload !== "object") {
+          throw new Error("暂无额度数据");
+        }
+
+        const planType = normalizePlanType(payload.plan_type || payload.planType) || normalizePlanType(account && account.id_token && account.id_token.plan_type);
+
+        return {
+          planType,
+          windows: buildCodexQuotaWindows(payload, planType),
+        };
+      }
+
+      function api(path, options = {}) {
+        const headers = new Headers(options.headers || {});
+        if (state.key) {
+          headers.set("X-Management-Key", state.key);
+        }
+        if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
+          headers.set("Content-Type", "application/json");
+        }
+
+        return fetch(path, {
+          method: options.method || "GET",
+          headers,
+          body: options.body,
+        }).then(async (response) => {
+          const text = await response.text();
+          let payload = {};
+          if (text) {
+            try {
+              payload = JSON.parse(text);
+            } catch (error) {
+              payload = { raw: text };
+            }
+          }
+          if (!response.ok) {
+            const message = payload.error || payload.raw || `${response.status} ${response.statusText}`;
+            throw new Error(message);
+          }
+          return payload;
+        });
+      }
+
+      function accountSummary() {
+        const accounts = Array.isArray(state.accounts) ? state.accounts : [];
+        const enabled = accounts.filter((account) => !account.disabled).length;
+        const attention = accounts.filter((account) => account.disabled || account.unavailable || String(account.status || "").toLowerCase() === "error").length;
+        const planCounts = {};
+
+        accounts.forEach((account) => {
+          const key = normalizePlanType(account && account.id_token && account.id_token.plan_type) || "unknown";
+          planCounts[key] = (planCounts[key] || 0) + 1;
+        });
+
+        return {
+          total: accounts.length,
+          enabled,
+          attention,
+          planCounts,
+        };
+      }
+
+      function usageSummary() {
+        const usage = state.usage && state.usage.usage ? state.usage.usage : null;
+        const failedRequests = state.usage ? Number(state.usage.failed_requests || 0) : 0;
+        const models = usage ? collectModelUsage(usage) : [];
+
+        return {
+          usage,
+          totalRequests: usage ? Number(usage.total_requests || 0) : 0,
+          successCount: usage ? Number(usage.success_count || 0) : 0,
+          failureCount: usage ? Number(usage.failure_count || failedRequests) : failedRequests,
+          totalTokens: usage ? Number(usage.total_tokens || 0) : 0,
+          clientCount: usage ? Object.keys(usage.apis || {}).length : 0,
+          models,
+        };
+      }
+
+      function collectModelUsage(usage) {
+        const results = [];
+        const apis = usage && usage.apis ? usage.apis : {};
+        const modelMap = new Map();
+
+        Object.keys(apis).forEach((apiName) => {
+          const api = apis[apiName] || {};
+          const models = api.models || {};
+          Object.keys(models).forEach((modelName) => {
+            const current = modelMap.get(modelName) || { requests: 0, tokens: 0 };
+            current.requests += Number(models[modelName].total_requests || 0);
+            current.tokens += Number(models[modelName].total_tokens || 0);
+            modelMap.set(modelName, current);
+          });
+        });
+
+        modelMap.forEach((value, name) => {
+          results.push({ name, requests: value.requests, tokens: value.tokens });
+        });
+
+        results.sort((left, right) => {
+          if (right.requests !== left.requests) {
+            return right.requests - left.requests;
+          }
+          return right.tokens - left.tokens;
+        });
+
+        return results;
+      }
+
+      function applyBusyState() {
+        document.querySelectorAll("button, input[type='file']").forEach((control) => {
+          control.disabled = state.busy;
+        });
+      }
+
+      function setBusy(flag) {
+        state.busy = Boolean(flag);
+        applyBusyState();
+      }
+
+      function syncQuotaCache() {
+        const names = new Set((Array.isArray(state.accounts) ? state.accounts : []).map((account) => account && account.name).filter(Boolean));
+        Object.keys(state.quotaByAccount).forEach((name) => {
+          if (!names.has(name)) {
+            delete state.quotaByAccount[name];
+          }
+        });
+      }
+
+      function statusBadge(account) {
+        if (account.disabled) {
+          return { label: "需处理", className: "warn" };
+        }
+        if (account.unavailable || String(account.status || "").toLowerCase() === "error") {
+          return { label: "异常", className: "bad" };
+        }
+        return { label: "正常", className: "ok" };
+      }
+
+      function addLog(message, level = "info") {
+        const time = new Date().toLocaleString("zh-CN", { hour12: false });
+        state.logs.unshift({ time, message, level });
+        if (state.logs.length > 200) {
+          state.logs.length = 200;
+        }
+        renderLogSurfaces();
+      }
+
+      function renderLogSurfaces() {
+        const preview = document.getElementById("dashboard-log-preview");
+        if (preview) {
+          preview.innerHTML = renderLogList(6);
+        }
+        const full = document.getElementById("full-log-list");
+        if (full) {
+          full.innerHTML = renderLogsTable();
+        }
+      }
+
+      function resetOverviewState() {
+        state.accounts = [];
+        state.quotaByAccount = {};
+        state.usage = null;
+        state.lastSync = "";
+        state.lastImportResult = null;
+        state.lastCleanupResult = null;
+      }
+
+      function setKey(value) {
+        state.key = String(value || "").trim();
+        if (state.key) {
+          localStorage.setItem(STORAGE_KEY, state.key);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+
+      function lockBackend(message = "") {
+        state.authenticated = false;
+        state.authChecking = false;
+        state.authError = message;
+        state.quotaRefreshInFlight = false;
+        state.quotaLastBulkRefreshAt = 0;
+        clearQuotaAutoRefresh();
+        resetOverviewState();
+        elements.body.classList.remove("nav-open");
+      }
+
+      function setImportPath(value) {
+        state.importPath = value;
+        localStorage.setItem(IMPORT_PATH_KEY, state.importPath);
+      }
+
+      function setAutoCleanup(value) {
+        state.autoCleanup = Boolean(value);
+        localStorage.setItem(AUTO_CLEANUP_KEY, state.autoCleanup ? "true" : "false");
+      }
+
+      function setQuotaQuery(value) {
+        state.quotaQuery = String(value || "");
+      }
+
+      function setQuotaStatusFilter(value) {
+        const normalized = String(value || "all");
+        state.quotaStatusFilter = ["all", "ok", "attention"].includes(normalized) ? normalized : "all";
+      }
+
+      function quotaPlanTypeForAccount(account) {
+        const name = account && account.name ? String(account.name) : "";
+        const quota = name ? state.quotaByAccount[name] : null;
+        return normalizePlanType((quota && quota.planType) || (account && account.id_token && account.id_token.plan_type) || (account && account.account_type));
+      }
+
+      function accountSupportsPrimaryQuota(account) {
+        return quotaPlanTypeForAccount(account) !== "free";
+      }
+
+      function quotaNeedsRefresh(account) {
+        const name = account && account.name ? String(account.name) : "";
+        const quota = name ? state.quotaByAccount[name] : null;
+        if (!quota) return true;
+        if (quota.refreshing) return false;
+        if (!quota.fetchedAt) return true;
+        return Date.now() - Number(quota.fetchedAt) >= QUOTA_AUTO_REFRESH_INTERVAL_MS;
+      }
+
+      function clearQuotaAutoRefresh() {
+        if (state.quotaAutoRefreshHandle) {
+          window.clearInterval(state.quotaAutoRefreshHandle);
+          state.quotaAutoRefreshHandle = 0;
+        }
+      }
+
+      function ensureManagementKey(actionName) {
+        if (state.key && state.authenticated) return true;
+        state.authError = "请先输入并验证管理密钥";
+        renderApp();
+        addLog(`${actionName}失败：请先完成管理登录`, "warn");
+        return false;
+      }
+
+      async function loadOverview(options = {}) {
+        if (!state.key) {
+          resetOverviewState();
+          renderApp();
+          return;
+        }
+
+        setBusy(true);
+        try {
+          const [accountsPayload, usagePayload] = await Promise.all([
+            api("/v0/management/codex/accounts"),
+            api("/v0/management/usage"),
+          ]);
+
+          state.accounts = accountsPayload.accounts || [];
+          state.usage = usagePayload;
+          state.lastSync = new Date().toISOString();
+          syncQuotaCache();
+          renderApp();
+          addLog(`已刷新概览：账号 ${state.accounts.length} 个，请求 ${usagePayload.usage ? usagePayload.usage.total_requests : 0} 次`);
+        } catch (error) {
+          renderApp();
+          if (!options.silentError) {
+            addLog(`刷新概览失败：${error.message}`, "error");
+          }
+          throw error;
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function authenticateKey(value, options = {}) {
+        setKey(value);
+        if (!state.key) {
+          lockBackend("请输入管理密钥");
+          renderApp();
+          return false;
+        }
+
+        state.authChecking = true;
+        state.authError = "";
+        renderApp();
+
+        try {
+          await loadOverview({ silentError: Boolean(options.silentError) });
+          state.authenticated = true;
+          state.authChecking = false;
+          state.authError = "";
+          renderApp();
+          return true;
+        } catch (error) {
+          if (options.clearStoredOnError) {
+            localStorage.removeItem(STORAGE_KEY);
+          }
+          const message = error && error.message ? error.message : "管理接口访问失败";
+          lockBackend(message);
+          renderApp();
+          return false;
+        }
+      }
+
+      async function loadUsageOnly() {
+        if (!state.key || !state.authenticated) {
+          state.usage = null;
+          renderApp();
+          return;
+        }
+        try {
+          const payload = await api("/v0/management/usage");
+          state.usage = payload;
+          state.lastSync = new Date().toISOString();
+          renderApp();
+        } catch (error) {
+          addLog(`拉取用量失败：${error.message}`, "error");
+        }
+      }
+
+      async function importDirectory() {
+        if (!ensureManagementKey("目录导入")) return;
+        if (!state.importPath.trim()) {
+          addLog("目录导入已跳过：服务器目录为空", "warn");
+          return;
+        }
+
+        setBusy(true);
+        try {
+          const payload = await api("/v0/management/codex/import-directory", {
+            method: "POST",
+            body: JSON.stringify({
+              path: state.importPath.trim(),
+              cleanup_invalid: state.autoCleanup,
+            }),
+          });
+
+          state.accounts = payload.accounts || [];
+          state.lastImportResult = payload;
+          if (payload.cleanup) {
+            state.lastCleanupResult = payload.cleanup;
+          }
+          state.lastSync = new Date().toISOString();
+          syncQuotaCache();
+          renderApp();
+          addLog(`目录导入完成：新增 ${payload.imported || 0} 个，跳过 ${payload.skipped || 0} 个`);
+          if (payload.cleanup && payload.cleanup.removed) {
+            addLog(`自动清理完成：移除 ${payload.cleanup.removed} 个失效账号`);
+          }
+          await loadUsageOnly();
+        } catch (error) {
+          addLog(`目录导入失败：${error.message}`, "error");
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function collectSelectedFiles() {
+        const files = [];
+        const uploadFiles = document.getElementById("upload-files");
+        const uploadDirectory = document.getElementById("upload-directory");
+        [uploadFiles, uploadDirectory].forEach((input) => {
+          if (!input || !input.files) return;
+          Array.from(input.files).forEach((file) => files.push(file));
+        });
+        return files;
+      }
+
+      function fileSelectionSummary(inputId, emptyLabel) {
+        const input = document.getElementById(inputId);
+        if (!input || !input.files || !input.files.length) {
+          return emptyLabel;
+        }
+
+        const files = Array.from(input.files);
+        if (inputId === "upload-directory") {
+          const first = files[0];
+          const root = String(first.webkitRelativePath || first.name || "").split("/")[0] || "已选目录";
+          return `${root} · ${files.length} 个文件`;
+        }
+
+        if (files.length === 1) {
+          return files[0].name;
+        }
+
+        return `已选择 ${files.length} 个文件`;
+      }
+
+      function refreshUploadSummaries() {
+        const filesSummary = document.getElementById("upload-files-summary");
+        if (filesSummary) {
+          filesSummary.textContent = fileSelectionSummary("upload-files", "未选择文件");
+        }
+
+        const directorySummary = document.getElementById("upload-directory-summary");
+        if (directorySummary) {
+          directorySummary.textContent = fileSelectionSummary("upload-directory", "未选择目录");
+        }
+      }
+
+      async function uploadSelected() {
+        if (!ensureManagementKey("文件上传")) return;
+        const files = collectSelectedFiles();
+        if (!files.length) {
+          addLog("上传已跳过：未选择任何文件", "warn");
+          return;
+        }
+
+        const form = new FormData();
+        form.append("cleanup_invalid", state.autoCleanup ? "true" : "false");
+        files.forEach((file) => {
+          form.append("files", file, file.name);
+        });
+
+        setBusy(true);
+        try {
+          const payload = await api("/v0/management/codex/import-files", {
+            method: "POST",
+            body: form,
+          });
+
+          state.accounts = payload.accounts || [];
+          state.lastImportResult = payload;
+          if (payload.cleanup) {
+            state.lastCleanupResult = payload.cleanup;
+          }
+          state.lastSync = new Date().toISOString();
+          syncQuotaCache();
+          renderApp();
+          addLog(`文件上传完成：新增 ${payload.imported || 0} 个，跳过 ${payload.skipped || 0} 个`);
+          await loadUsageOnly();
+        } catch (error) {
+          addLog(`文件上传失败：${error.message}`, "error");
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function cleanupInvalid() {
+        if (!ensureManagementKey("清理失效账号")) return;
+
+        setBusy(true);
+        try {
+          const payload = await api("/v0/management/codex/cleanup-invalid", {
+            method: "POST",
+            body: "{}",
+          });
+
+          state.accounts = payload.accounts || [];
+          state.lastCleanupResult = payload;
+          state.lastSync = new Date().toISOString();
+          syncQuotaCache();
+          renderApp();
+          addLog(`失效账号清理完成：刷新 ${payload.refreshed || 0} 个，移除 ${payload.removed || 0} 个`);
+          await loadUsageOnly();
+        } catch (error) {
+          addLog(`失效账号清理失败：${error.message}`, "error");
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function refreshQuota(name, options = {}) {
+        if (!ensureManagementKey("刷新额度")) return;
+
+        const account = (state.accounts || []).find((item) => item && item.name === name);
+        if (!account) return;
+        const previousQuota = state.quotaByAccount[name] || null;
+
+        state.quotaByAccount[name] = {
+          status: previousQuota && Array.isArray(previousQuota.windows) && previousQuota.windows.length ? "success" : "loading",
+          windows: previousQuota && Array.isArray(previousQuota.windows) ? previousQuota.windows : [],
+          planType: normalizePlanType((previousQuota && previousQuota.planType) || (account && account.id_token && account.id_token.plan_type)),
+          fetchedAt: previousQuota && previousQuota.fetchedAt ? previousQuota.fetchedAt : 0,
+          refreshing: true,
+          lastError: "",
+        };
+        renderApp();
+
+        try {
+          const quota = await fetchCodexQuota(account);
+          state.quotaByAccount[name] = {
+            status: "success",
+            windows: quota.windows || [],
+            planType: quota.planType || null,
+            fetchedAt: Date.now(),
+            refreshing: false,
+            lastError: "",
+          };
+          renderApp();
+          if (!options.silentLog) {
+            addLog(`已刷新 ${name} 的 Codex 额度`);
+          }
+          return true;
+        } catch (error) {
+          const fallbackWindows = previousQuota && Array.isArray(previousQuota.windows) ? previousQuota.windows : [];
+          const fallbackPlanType = normalizePlanType((previousQuota && previousQuota.planType) || (account && account.id_token && account.id_token.plan_type));
+          if (fallbackWindows.length) {
+            state.quotaByAccount[name] = {
+              status: "success",
+              windows: fallbackWindows,
+              planType: fallbackPlanType,
+              fetchedAt: previousQuota && previousQuota.fetchedAt ? previousQuota.fetchedAt : 0,
+              refreshing: false,
+              lastError: error.message || "未知错误",
+            };
+          } else {
+            state.quotaByAccount[name] = {
+              status: "error",
+              windows: [],
+              planType: fallbackPlanType,
+              error: error.message || "未知错误",
+              fetchedAt: previousQuota && previousQuota.fetchedAt ? previousQuota.fetchedAt : 0,
+              refreshing: false,
+              lastError: error.message || "未知错误",
+            };
+          }
+          renderApp();
+          if (!options.silentLog) {
+            addLog(`刷新 ${name} 的额度失败：${error.message}`, "error");
+          }
+          return false;
+        }
+      }
+
+      async function refreshQuotaCollection(options = {}) {
+        if (!ensureManagementKey("刷新额度")) return;
+        if (state.quotaRefreshInFlight) return;
+
+        const accounts = Array.isArray(options.accounts) ? options.accounts : filteredQuotaAccounts();
+        const targets = accounts.filter((account) => account && account.name && (!options.onlyStale || quotaNeedsRefresh(account)));
+        if (!targets.length) {
+          if (!options.silentLog) {
+            addLog("当前没有需要刷新的额度数据");
+          }
+          return;
+        }
+
+        state.quotaRefreshInFlight = true;
+        renderApp();
+
+        let refreshed = 0;
+        let failed = 0;
+        try {
+          for (const account of targets) {
+            const ok = await refreshQuota(account.name, { silentLog: true });
+            if (ok) {
+              refreshed += 1;
+            } else {
+              failed += 1;
+            }
+          }
+          state.quotaLastBulkRefreshAt = Date.now();
+          if (!options.silentLog) {
+            addLog(`已刷新 ${refreshed} 个账号的额度${failed ? `，失败 ${failed} 个` : ""}`);
+          }
+        } finally {
+          state.quotaRefreshInFlight = false;
+          renderApp();
+        }
+      }
+
+      function syncQuotaAutoRefresh(route) {
+        if (!state.authenticated || route !== "quota") {
+          clearQuotaAutoRefresh();
+          return;
+        }
+
+        if (!state.quotaAutoRefreshHandle) {
+          state.quotaAutoRefreshHandle = window.setInterval(() => {
+            refreshQuotaCollection({ onlyStale: true, silentLog: true });
+          }, QUOTA_AUTO_REFRESH_INTERVAL_MS);
+        }
+
+        if (!state.quotaRefreshInFlight && filteredQuotaAccounts().some((account) => quotaNeedsRefresh(account))) {
+          refreshQuotaCollection({ onlyStale: true, silentLog: true });
+        }
+      }
+
+      async function deleteAccount(name) {
+        if (!ensureManagementKey("删除账号")) return;
+        if (!name) return;
+        if (!window.confirm(`确定删除账号文件 ${name} 吗？`)) return;
+
+        setBusy(true);
+        try {
+          await api(`/v0/management/codex/accounts/${encodeURIComponent(name)}`, {
+            method: "DELETE",
+          });
+
+          delete state.quotaByAccount[name];
+          addLog(`已删除账号文件：${name}`);
+          await loadOverview();
+        } catch (error) {
+          addLog(`删除账号文件失败（${name}）：${error.message}`, "error");
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function clearLogs() {
+        state.logs = [];
+        renderApp();
+        addLog("本地操作日志已清空");
+      }
+
+      function filteredQuotaAccounts() {
+        const query = state.quotaQuery.trim().toLowerCase();
+        return (Array.isArray(state.accounts) ? state.accounts : []).filter((account) => {
+          const badge = statusBadge(account);
+          if (state.quotaStatusFilter === "ok" && badge.className !== "ok") {
+            return false;
+          }
+          if (state.quotaStatusFilter === "attention" && badge.className === "ok") {
+            return false;
+          }
+          if (!query) {
+            return true;
+          }
+          const searchable = [
+            account.email,
+            account.label,
+            account.name,
+            account.path,
+            resolvePlanLabel(account && account.id_token && account.id_token.plan_type),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return searchable.includes(query);
+        });
+      }
+
+      function quotaMeter(window) {
+        const remaining = window.usedPercent == null ? null : Math.max(0, Math.min(100, 100 - Number(window.usedPercent)));
+        const percentLabel = remaining == null ? "100%" : `${Math.round(remaining)}%`;
+        const fillWidth = remaining == null ? 100 : remaining;
+        let unit = "--";
+        if (String(window.label || "").includes("5")) {
+          unit = "5H";
+        } else if (String(window.label || "").includes("7") || String(window.label || "").includes("周")) {
+          unit = "7D";
+        }
+
+        return `
+          <div class="quota-meter">
+            <div class="quota-meter-top">
+              <strong>${escapeHTML(percentLabel)}</strong>
+              <span class="quota-meter-time">${escapeHTML(window.resetLabel || "--")}</span>
+              <span class="quota-meter-unit">${escapeHTML(unit)}</span>
+            </div>
+            <div class="quota-track">
+              <div class="quota-fill ${quotaFillClass(fillWidth)}" style="width: ${fillWidth}%;"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      function quotaCellNote(quota) {
+        if (!quota) return "";
+        if (quota.refreshing) {
+          return '<div class="quota-note warn">刷新中，显示上次结果</div>';
+        }
+        if (quota.lastError && Array.isArray(quota.windows) && quota.windows.length) {
+          return '<div class="quota-note bad">刷新失败，保留上次结果</div>';
+        }
+        return "";
+      }
+
+      function findQuotaWindow(windows, preferredIds, labelHints) {
+        const preferredIdSet = new Set(preferredIds || []);
+        const idMatch = (windows || []).find((item) => preferredIdSet.has(item.id));
+        if (idMatch) return idMatch;
+        return (windows || []).find((item) => {
+          const label = String(item && item.label || "");
+          return (labelHints || []).some((hint) => label.includes(hint));
+        }) || null;
+      }
+
+      function quotaWindowsForDisplay(account, quota) {
+        const windows = Array.isArray(quota && quota.windows) ? quota.windows : [];
+        if (!windows.length) return [];
+
+        const rateWindows = windows.filter((item) => item && item.group === "rate");
+        const source = rateWindows.length ? rateWindows : windows;
+        const supportsPrimary = accountSupportsPrimaryQuota(account);
+
+        const primaryWindow = supportsPrimary ? findQuotaWindow(source, ["primary"], ["5"]) : null;
+        const weeklyWindow = findQuotaWindow(source, ["weekly"], ["7", "周"]);
+
+        if (!supportsPrimary) {
+          return weeklyWindow ? [weeklyWindow] : source.length ? [source[source.length - 1]] : [];
+        }
+
+        const results = [];
+        if (primaryWindow) {
+          results.push(primaryWindow);
+        }
+        if (weeklyWindow && weeklyWindow !== primaryWindow) {
+          results.push(weeklyWindow);
+        }
+        if (results.length) {
+          return results;
+        }
+        return source.slice(0, 2);
+      }
+
+      function renderQuotaSummaryCell(account) {
+        const name = account && account.name ? String(account.name) : "";
+        const quota = state.quotaByAccount[name];
+
+        if (!state.key) {
+          return '<div class="quota-placeholder">未连接</div>';
+        }
+        if (!resolveCodexAccountId(account)) {
+          return '<div class="cell-message error">缺少账号 ID</div>';
+        }
+        if (!quota || quota.status === "idle") {
+          return '<div class="quota-placeholder">未刷新</div>';
+        }
+        if (quota.status === "loading" && (!Array.isArray(quota.windows) || !quota.windows.length)) {
+          return '<div class="quota-placeholder">刷新中...</div>';
+        }
+        if (quota.status === "error") {
+          return `<div class="cell-message error">${escapeHTML(quota.error || "刷新失败")}</div>`;
+        }
+
+        const windows = quotaWindowsForDisplay(account, quota);
+        if (!windows.length) {
+          return '<div class="quota-placeholder">暂无额度数据</div>';
+        }
+
+        return `
+          <div class="quota-stack">
+            <div class="quota-inline-grid${windows.length === 1 ? " single" : ""}">
+              ${windows.map((window) => quotaMeter(window)).join("")}
+            </div>
+            ${quotaCellNote(quota)}
+          </div>
+        `;
+      }
+
+      function metricCard(label, value, helper, isSmall) {
+        return `
+          <article class="stat-card">
+            <div class="stat-label">${escapeHTML(label)}</div>
+            <div class="stat-value${isSmall ? " small" : ""}">${escapeHTML(value)}</div>
+            ${helper ? `<div class="helper" style="margin-top:8px;">${escapeHTML(helper)}</div>` : ""}
+          </article>
+        `;
+      }
+
+      function renderUsageTable(limit) {
+        const usage = usageSummary();
+        const models = usage.models.slice(0, limit);
+        if (!models.length) {
+          return '<div class="empty-box">当前没有请求记录。完成一次代理调用后，这里会显示模型用量。</div>';
+        }
+
+        return `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>模型</th>
+                  <th>请求数</th>
+                  <th>Token 数</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${models.map((model) => `
+                  <tr>
+                    <td class="mono">${escapeHTML(model.name)}</td>
+                    <td>${formatCount(model.requests)}</td>
+                    <td>${formatCount(model.tokens)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      function renderLogList(limit) {
+        const logs = state.logs.slice(0, limit);
+        if (!logs.length) {
+          return '<div class="empty-box">当前还没有操作日志。</div>';
+        }
+
+        return `
+          <div class="log-list">
+            ${logs.map((entry) => `
+              <article class="log-item ${escapeHTML(entry.level || "info")}">
+                <time>${escapeHTML(entry.time)}</time>
+                <p>${escapeHTML(entry.message)}</p>
+              </article>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderLogsTable() {
+        if (!state.logs.length) {
+          return '<div class="empty-box">当前还没有操作日志。</div>';
+        }
+
+        return `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>级别</th>
+                  <th>内容</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${state.logs.map((entry) => `
+                  <tr>
+                    <td class="mono">${escapeHTML(entry.time)}</td>
+                    <td>${escapeHTML(formatLogLevel(entry.level))}</td>
+                    <td>${escapeHTML(entry.message)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      function renderOperationTable(results, emptyMessage) {
+        const items = Array.isArray(results) ? results : [];
+        if (!items.length) {
+          return `<div class="empty-box">${escapeHTML(emptyMessage)}</div>`;
+        }
+
+        return `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>邮箱</th>
+                  <th>状态</th>
+                  <th>原因</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map((item) => `
+                  <tr>
+                    <td>${escapeHTML(item.name || "--")}</td>
+                    <td>${escapeHTML(item.email || "--")}</td>
+                    <td>${escapeHTML(item.status || "--")}</td>
+                    <td>${escapeHTML(item.reason || "--")}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      function formatLogLevel(level) {
+        const normalized = String(level || "info").toLowerCase();
+        if (normalized === "error") {
+          return "错误";
+        }
+        if (normalized === "warn" || normalized === "warning") {
+          return "警告";
+        }
+        if (normalized === "info") {
+          return "信息";
+        }
+        return normalized;
+      }
+
+      function renderDashboardView() {
+        const summary = accountSummary();
+        const usage = usageSummary();
+        const syncLabel = state.lastSync ? formatTime(state.lastSync) : "未同步";
+        const planTags = Object.keys(summary.planCounts).map((key) => {
+          const count = summary.planCounts[key];
+          return `<span class="small-pill">${escapeHTML(key)} ${formatCount(count)}</span>`;
+        }).join("");
+
+        return `
+          <section class="grid-4">
+            ${metricCard("账号总数", formatCount(summary.total), "当前已加载账号文件", false)}
+            ${metricCard("可用账号", formatCount(summary.enabled), "未标记异常", false)}
+            ${metricCard("异常账号", formatCount(summary.attention), "建议手动清理", false)}
+            ${metricCard("最近同步", syncLabel, state.key ? "手动刷新后更新" : "保存密钥后开始同步", true)}
+          </section>
+
+          <section class="panel">
+            <div class="section-kicker">账号池</div>
+            <h3>状态总览</h3>
+            <div class="helper" style="margin-top:6px;">这套界面只保留 Codex 管理能力，重点展示账号状态、额度检查和导入结果。</div>
+            <div class="summary-row">
+              ${planTags || '<span class="small-pill">暂无套餐分布</span>'}
+            </div>
+          </section>
+
+          <section class="grid-2">
+            <article class="table-shell">
+              <div class="table-head">
+                <div>
+                  <div class="section-kicker">代理用量</div>
+                  <div class="table-title">请求用量</div>
+                </div>
+              </div>
+              <section class="grid-4" style="margin-bottom:12px;">
+                ${metricCard("总请求数", formatCount(usage.totalRequests), "", false)}
+                ${metricCard("成功请求", formatCount(usage.successCount), "", false)}
+                ${metricCard("失败请求", formatCount(usage.failureCount), "", false)}
+                ${metricCard("累计 Token", formatCount(usage.totalTokens), "", false)}
+              </section>
+              ${renderUsageTable(6)}
+            </article>
+
+            <article class="table-shell">
+              <div class="table-head">
+                <div>
+                  <div class="section-kicker">最近活动</div>
+                  <div class="table-title">最近操作</div>
+                </div>
+                <a class="inline-link" href="#/logs">查看全部日志</a>
+              </div>
+              <div id="dashboard-log-preview">${renderLogList(6)}</div>
+            </article>
+          </section>
+        `;
+      }
+
+      function quotaRow(account) {
+        const badge = statusBadge(account);
+        const plan = resolvePlanLabel(quotaPlanTypeForAccount(account));
+        const quota = state.quotaByAccount[account.name] || null;
+        const refreshedAt = (quota && quota.fetchedAt) || account.last_refresh || account.updated_at || account.modtime;
+
+        return `
+          <tr>
+            <td>
+              <div class="row-title">${escapeHTML(account.email || account.label || account.name || "--")}</div>
+              <div class="row-subtitle">${escapeHTML(account.name || "--")}</div>
+            </td>
+            <td><span class="plan-pill compact">${escapeHTML(plan)}</span></td>
+            <td><span class="status-pill compact ${badge.className}">${escapeHTML(badge.label)}</span></td>
+            <td class="quota-cell">${renderQuotaSummaryCell(account)}</td>
+            <td>
+              <div>${escapeHTML(formatRelativeTime(refreshedAt))}</div>
+              <div class="row-subtitle">${escapeHTML(formatTime(refreshedAt))}</div>
+            </td>
+            <td>
+              <div class="actions-col actions-grid">
+                <button class="button button-secondary" data-refresh-quota="${escapeHTML(account.name || "")}" type="button">刷新</button>
+                <button class="button button-danger" data-delete="${escapeHTML(account.name || "")}" type="button">删除</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+
+      function renderQuotaView() {
+        const accounts = Array.isArray(state.accounts) ? state.accounts : [];
+        const filtered = filteredQuotaAccounts();
+
+        if (!accounts.length) {
+          return `
+            <section class="table-shell">
+              <div class="table-head">
+                <div>
+                  <div class="section-kicker">账号额度</div>
+                  <div class="table-title">账号清单</div>
+                </div>
+              </div>
+              <div class="empty-box">当前没有账号数据。先导入账号或保存管理密钥后刷新概览。</div>
+            </section>
+          `;
+        }
+
+        return `
+          <section class="table-shell">
+            <div class="table-head quota-head">
+              <div class="quota-head-copy">
+                <div class="section-kicker">账号额度</div>
+                <div class="table-title">账号清单</div>
+                <div class="helper" style="margin-top:6px;">按邮箱、文件名和套餐筛选，plus/team 显示 5H + 7D，free 仅显示 7D。</div>
+              </div>
+              <div class="quota-toolbar-grid">
+                <label class="toolbar-cell search">
+                  <span class="field-label">筛选账号</span>
+                  <input id="quota-query" type="text" value="${escapeHTML(state.quotaQuery)}" placeholder="按邮箱、文件名或套餐筛选" />
+                </label>
+                <label class="toolbar-cell">
+                  <span class="field-label">显示状态</span>
+                  <select id="quota-status-filter">
+                    <option value="all" ${state.quotaStatusFilter === "all" ? "selected" : ""}>全部账号</option>
+                    <option value="ok" ${state.quotaStatusFilter === "ok" ? "selected" : ""}>仅正常</option>
+                    <option value="attention" ${state.quotaStatusFilter === "attention" ? "selected" : ""}>仅异常</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="toolbar-meta">
+              <span class="small-pill">已显示 ${formatCount(filtered.length)} / ${formatCount(accounts.length)}</span>
+              <span class="small-pill">plus/team 显示 5H + 7D，free 仅显示 7D</span>
+              <span class="small-pill">每 1 小时自动刷新一次</span>
+              <span class="small-pill">${escapeHTML(state.quotaLastBulkRefreshAt ? `上次额度刷新 ${formatRelativeTime(state.quotaLastBulkRefreshAt)}` : "额度尚未批量刷新")}</span>
+              <button class="button button-secondary" data-action="refresh-quota-all" type="button" ${state.quotaRefreshInFlight ? "disabled" : ""}>${state.quotaRefreshInFlight ? "刷新中..." : "刷新全部额度"}</button>
+            </div>
+            <div class="table-wrap quota-table-wrap">
+              <table class="quota-table">
+                <colgroup>
+                  <col style="width: 284px;" />
+                  <col style="width: 72px;" />
+                  <col style="width: 84px;" />
+                  <col style="width: 360px;" />
+                  <col style="width: 132px;" />
+                  <col style="width: 112px;" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>账号</th>
+                    <th>套餐</th>
+                    <th>健康状态</th>
+                    <th>额度</th>
+                    <th>最近刷新</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filtered.length ? filtered.map(quotaRow).join("") : `
+                    <tr>
+                      <td colspan="6">
+                        <div class="empty-box">当前筛选条件下没有账号。</div>
+                      </td>
+                    </tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderImportView() {
+        const importResult = state.lastImportResult;
+        const cleanupResult = state.lastCleanupResult;
+
+        return `
+          <section class="grid-2">
+            <article class="panel">
+              <div class="section-kicker">目录导入</div>
+              <h3>服务器目录</h3>
+              <div class="helper" style="margin-top:6px;">推荐直接读取导出目录中的 <span class="mono">codex-*.json</span> 文件。</div>
+              <label class="field" style="margin-top:12px;">
+                <span class="field-label">服务器目录</span>
+                <input id="import-path" type="text" value="${escapeHTML(state.importPath)}" placeholder="${escapeHTML(DEFAULT_IMPORT_PATH)}" />
+              </label>
+              <label class="switch-row" style="margin-top:10px;">
+                <input id="auto-cleanup" type="checkbox" ${state.autoCleanup ? "checked" : ""} />
+                导入后自动清除失效账号
+              </label>
+              <div class="button-row" style="margin-top:12px;">
+                <button class="button button-primary" id="import-directory" type="button">导入服务器目录</button>
+                <button class="button button-secondary" data-action="refresh-overview" type="button">同步概览</button>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="section-kicker">浏览器上传</div>
+              <h3>批量导入文件</h3>
+              <div class="helper" style="margin-top:6px;">支持多选文件，也支持在兼容浏览器里直接选择整个目录。</div>
+              <div class="file-picker" style="margin-top:12px;">
+                <span class="field-label">选中文件</span>
+                <div class="file-picker-row file-picker-grid">
+                  <input id="upload-files" class="visually-hidden-file" type="file" accept=".json" multiple />
+                  <button class="button button-secondary" data-action="pick-files" type="button">选择文件</button>
+                  <div class="file-picker-summary" id="upload-files-summary">未选择文件</div>
+                </div>
+              </div>
+              <div class="file-picker" style="margin-top:12px;">
+                <span class="field-label">上传整个目录</span>
+                <div class="file-picker-row file-picker-grid">
+                  <input id="upload-directory" class="visually-hidden-file" type="file" accept=".json" webkitdirectory directory multiple />
+                  <button class="button button-secondary" data-action="pick-directory" type="button">选择目录</button>
+                  <div class="file-picker-summary" id="upload-directory-summary">未选择目录</div>
+                </div>
+              </div>
+              <div class="button-row" style="margin-top:12px;">
+                <button class="button button-secondary" id="upload-selected" type="button">上传选中内容</button>
+              </div>
+            </article>
+          </section>
+
+          <section class="table-shell">
+            <div class="table-head">
+              <div>
+                <div class="section-kicker">最近导入</div>
+                <div class="table-title">导入结果</div>
+              </div>
+            </div>
+            ${importResult ? `
+              <section class="grid-4" style="margin-bottom:12px;">
+                ${metricCard("新增账号", formatCount(importResult.imported || 0), "", false)}
+                ${metricCard("跳过文件", formatCount(importResult.skipped || 0), "", false)}
+                ${metricCard("当前账号", formatCount((importResult.accounts || []).length), "", false)}
+                ${metricCard("自动清理", importResult.cleanup ? `移除 ${formatCount(importResult.cleanup.removed || 0)}` : "未执行", "", true)}
+              </section>
+              ${renderOperationTable(importResult.results, "还没有导入结果。")}
+            ` : '<div class="empty-box">还没有导入结果。执行一次目录导入或文件上传后，这里会显示明细。</div>'}
+          </section>
+
+          <section class="table-shell">
+            <div class="table-head">
+              <div>
+                <div class="section-kicker">最近清理</div>
+                <div class="table-title">失效账号清理结果</div>
+              </div>
+            </div>
+            ${cleanupResult ? `
+              <section class="grid-4" style="margin-bottom:12px;">
+                ${metricCard("已移除", formatCount(cleanupResult.removed || 0), "", false)}
+                ${metricCard("已刷新", formatCount(cleanupResult.refreshed || 0), "", false)}
+                ${metricCard("保留账号", formatCount(cleanupResult.kept || 0), "", false)}
+                ${metricCard("当前账号", formatCount((cleanupResult.accounts || state.accounts || []).length), "", false)}
+              </section>
+              ${renderOperationTable(cleanupResult.results, "还没有清理结果。")}
+            ` : '<div class="empty-box">还没有清理结果。执行自动清理或手动清理后，这里会显示明细。</div>'}
+          </section>
+        `;
+      }
+
+      function renderLogsView() {
+        const summary = accountSummary();
+        const usage = usageSummary();
+        const cachedQuotaCount = Object.values(state.quotaByAccount).filter((item) => item && item.status === "success").length;
+
+        return `
+          <section class="grid-4">
+            ${metricCard("日志条数", formatCount(state.logs.length), "", false)}
+            ${metricCard("账号数量", formatCount(summary.total), "", false)}
+            ${metricCard("缓存额度", formatCount(cachedQuotaCount), "", false)}
+            ${metricCard("累计请求", formatCount(usage.totalRequests), "", false)}
+          </section>
+
+          <section class="table-shell">
+            <div class="table-head">
+              <div>
+                <div class="section-kicker">完整日志</div>
+                <div class="table-title">操作日志</div>
+              </div>
+              <div class="button-row">
+                <button class="button button-secondary" data-action="refresh-overview" type="button">刷新概览</button>
+                <button class="button button-secondary" data-action="clear-logs" type="button">清空日志</button>
+              </div>
+            </div>
+            <div id="full-log-list">${renderLogsTable()}</div>
+          </section>
+        `;
+      }
+
+      function renderAuthShell() {
+        const backendVisible = state.authenticated;
+        elements.authShell.hidden = backendVisible;
+        elements.backendShell.hidden = !backendVisible;
+
+        if (backendVisible) {
+          return;
+        }
+
+        if (document.activeElement !== elements.authKeyInput) {
+          elements.authKeyInput.value = state.key;
+        }
+
+        elements.authSubmit.textContent = state.authChecking ? "正在验证..." : "进入后台";
+        elements.authClear.disabled = !state.key;
+
+        let statusClass = "auth-status";
+        let statusText = "输入一次管理密钥后会保存在当前浏览器，下次会自动尝试进入后台。";
+
+        if (state.authChecking) {
+          statusClass += " warn";
+          statusText = "正在验证管理密钥，请稍候。";
+        } else if (state.authError) {
+          statusClass += " bad";
+          statusText = state.authError;
+        } else if (state.key) {
+          statusClass += " warn";
+          statusText = "检测到已保存的管理密钥，验证通过后即可进入后台。";
+        }
+
+        elements.authStatus.className = statusClass;
+        elements.authStatus.textContent = statusText;
+      }
+
+      function updateShell() {
+        const route = getRoute();
+        const meta = ROUTES[route];
+        const summary = accountSummary();
+        const usage = usageSummary();
+
+        elements.pageTitle.textContent = meta.title;
+        elements.pageDescription.textContent = meta.description;
+        elements.quickAccounts.textContent = formatCount(summary.total);
+        elements.quickEnabled.textContent = formatCount(summary.enabled);
+        elements.quickRequests.textContent = formatCount(usage.totalRequests);
+        elements.quickSync.textContent = state.lastSync ? formatRelativeTime(state.lastSync) : "未同步";
+
+        elements.navLinks.forEach((link) => {
+          link.classList.toggle("active", link.dataset.routeLink === route);
+        });
+      }
+
+      function renderView() {
+        if (!state.authenticated) {
+          return;
+        }
+
+        const route = getRoute();
+        const renderer = {
+          dashboard: renderDashboardView,
+          quota: renderQuotaView,
+          import: renderImportView,
+          logs: renderLogsView,
+        }[route];
+
+        elements.view.dataset.route = route;
+        elements.view.innerHTML = renderer ? renderer() : renderDashboardView();
+        applyBusyState();
+      }
+
+      function renderApp() {
+        const route = getRoute();
+        renderAuthShell();
+        if (!state.authenticated) {
+          syncQuotaAutoRefresh("");
+          applyBusyState();
+          return;
+        }
+        updateShell();
+        renderView();
+        syncQuotaAutoRefresh(route);
+      }
+
+      elements.authForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const ok = await authenticateKey(elements.authKeyInput.value);
+        if (ok) {
+          addLog("管理密钥验证通过，已进入后台");
+        }
+      });
+
+      elements.authClear.addEventListener("click", () => {
+        setKey("");
+        lockBackend("");
+        renderApp();
+        addLog("浏览器中的管理密钥已清除");
+      });
+
+      document.getElementById("mobile-menu").addEventListener("click", () => {
+        elements.body.classList.toggle("nav-open");
+      });
+
+      document.getElementById("drawer-backdrop").addEventListener("click", () => {
+        elements.body.classList.remove("nav-open");
+      });
+
+      elements.navLinks.forEach((link) => {
+        link.addEventListener("click", () => {
+          elements.body.classList.remove("nav-open");
+        });
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          elements.body.classList.remove("nav-open");
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+
+        if (button.dataset.action === "pick-files") {
+          const input = document.getElementById("upload-files");
+          if (input) input.click();
+          return;
+        }
+        if (button.dataset.action === "pick-directory") {
+          const input = document.getElementById("upload-directory");
+          if (input) input.click();
+          return;
+        }
+        if (button.dataset.action === "refresh-overview") {
+          loadOverview().catch(() => {});
+          return;
+        }
+        if (button.dataset.action === "refresh-quota-all") {
+          refreshQuotaCollection();
+          return;
+        }
+        if (button.dataset.action === "cleanup-invalid") {
+          cleanupInvalid();
+          return;
+        }
+        if (button.dataset.action === "clear-logs") {
+          clearLogs();
+          return;
+        }
+        if (button.id === "import-directory") {
+          importDirectory();
+          return;
+        }
+        if (button.id === "upload-selected") {
+          uploadSelected();
+          return;
+        }
+        if (button.dataset.refreshQuota) {
+          refreshQuota(button.dataset.refreshQuota);
+          return;
+        }
+        if (button.dataset.delete) {
+          deleteAccount(button.dataset.delete);
+        }
+      });
+
+      document.addEventListener("input", (event) => {
+        if (event.target && event.target.id === "import-path") {
+          setImportPath(event.target.value);
+        }
+        if (event.target && event.target.id === "quota-query") {
+          setQuotaQuery(event.target.value);
+          renderApp();
+        }
+      });
+
+      document.addEventListener("change", (event) => {
+        if (event.target && event.target.id === "auto-cleanup") {
+          setAutoCleanup(event.target.checked);
+        }
+        if (event.target && (event.target.id === "upload-files" || event.target.id === "upload-directory")) {
+          refreshUploadSummaries();
+        }
+        if (event.target && event.target.id === "quota-status-filter") {
+          setQuotaStatusFilter(event.target.value);
+          renderApp();
+        }
+      });
+
+      window.addEventListener("hashchange", () => {
+        elements.body.classList.remove("nav-open");
+        renderApp();
+      });
+
+      ensureRoute();
+      addLog("Codex 控制台已就绪");
+      renderApp();
+      if (state.key) {
+        authenticateKey(state.key, { silentError: true, clearStoredOnError: true }).then((ok) => {
+          if (!ok) {
+            addLog("已保存的管理密钥验证失败，请重新输入", "warn");
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

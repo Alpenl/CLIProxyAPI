@@ -208,3 +208,154 @@ func TestDefaultRequestLoggerFactory_UsesResolvedLogDirectory(t *testing.T) {
 		}
 	}
 }
+
+func TestManagementControlPanel_ServesEmbeddedCodexUI(t *testing.T) {
+	server := newTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/management.html", nil)
+	rr := httptest.NewRecorder()
+	server.engine.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "Codex 控制台") {
+		t.Fatalf("expected embedded Codex UI content, body=%s", body)
+	}
+	if !strings.Contains(body, "仪表盘") {
+		t.Fatalf("expected dashboard navigation item, body=%s", body)
+	}
+	if !strings.Contains(body, "账号额度") {
+		t.Fatalf("expected quota navigation item, body=%s", body)
+	}
+	if !strings.Contains(body, "账号导入") {
+		t.Fatalf("expected import navigation item, body=%s", body)
+	}
+	if !strings.Contains(body, "操作日志") {
+		t.Fatalf("expected logs navigation item, body=%s", body)
+	}
+	if !strings.Contains(body, "账号清单") {
+		t.Fatalf("expected account list title, body=%s", body)
+	}
+	if !strings.Contains(body, "筛选账号") {
+		t.Fatalf("expected account filter label, body=%s", body)
+	}
+	if !strings.Contains(body, "显示状态") {
+		t.Fatalf("expected quota status filter label, body=%s", body)
+	}
+	if !strings.Contains(body, "选择文件") {
+		t.Fatalf("expected custom file picker label, body=%s", body)
+	}
+	if !strings.Contains(body, "选择目录") {
+		t.Fatalf("expected custom directory picker label, body=%s", body)
+	}
+	if !strings.Contains(body, "auth-shell") {
+		t.Fatalf("expected auth shell structure, body=%s", body)
+	}
+	if !strings.Contains(body, "backend-shell") {
+		t.Fatalf("expected backend shell structure, body=%s", body)
+	}
+	if !strings.Contains(body, "管理登录") {
+		t.Fatalf("expected management login title, body=%s", body)
+	}
+	if !strings.Contains(body, "进入后台") {
+		t.Fatalf("expected login submit label, body=%s", body)
+	}
+	if !strings.Contains(body, "page-header-grid") {
+		t.Fatalf("expected stable page header grid structure, body=%s", body)
+	}
+	if !strings.Contains(body, "quota-toolbar-grid") {
+		t.Fatalf("expected stable quota toolbar grid structure, body=%s", body)
+	}
+	if !strings.Contains(body, "overview-list") {
+		t.Fatalf("expected stable overview list structure, body=%s", body)
+	}
+	if !strings.Contains(body, "quota-table") {
+		t.Fatalf("expected stable quota table structure, body=%s", body)
+	}
+	if !strings.Contains(body, "actions-grid") {
+		t.Fatalf("expected stable action grid structure, body=%s", body)
+	}
+	if !strings.Contains(body, "file-picker-grid") {
+		t.Fatalf("expected stable file picker grid structure, body=%s", body)
+	}
+	if !strings.Contains(body, "align-items: stretch;") {
+		t.Fatalf("expected full-height backend stretch layout, body=%s", body)
+	}
+	if !strings.Contains(body, "grid-template-rows: auto minmax(0, 1fr);") {
+		t.Fatalf("expected main shell viewport row layout, body=%s", body)
+	}
+	if !strings.Contains(body, "elements.view.dataset.route = route;") {
+		t.Fatalf("expected route-aware view sizing logic, body=%s", body)
+	}
+	if !strings.Contains(body, "scrollbar-gutter: stable both-edges;") {
+		t.Fatalf("expected stable scrollbar gutter to prevent sidebar shifting, body=%s", body)
+	}
+	if !strings.Contains(body, "grid-auto-rows: max-content;") {
+		t.Fatalf("expected dashboard rows to keep natural height, body=%s", body)
+	}
+	if !strings.Contains(body, "calc(100% - 20px)") {
+		t.Fatalf("expected app shell width to avoid viewport scrollbar jitter, body=%s", body)
+	}
+	if !strings.Contains(body, "QUOTA_AUTO_REFRESH_INTERVAL_MS = 60 * 60 * 1000") {
+		t.Fatalf("expected hourly quota auto refresh interval, body=%s", body)
+	}
+	if !strings.Contains(body, "refresh-quota-all") {
+		t.Fatalf("expected bulk quota refresh action, body=%s", body)
+	}
+	if strings.Contains(body, "<th>授权方式</th>") {
+		t.Fatalf("expected authorization column removed, body=%s", body)
+	}
+	if strings.Contains(body, "<th>登录状态</th>") {
+		t.Fatalf("expected login status column removed, body=%s", body)
+	}
+	if strings.Contains(body, "<th>登录凭据</th>") {
+		t.Fatalf("expected credential column removed, body=%s", body)
+	}
+	if !strings.Contains(body, "<th>套餐</th>") {
+		t.Fatalf("expected plan column kept, body=%s", body)
+	}
+	if !strings.Contains(body, "<th>健康状态</th>") {
+		t.Fatalf("expected health column kept, body=%s", body)
+	}
+	if !strings.Contains(body, "<th>额度</th>") {
+		t.Fatalf("expected unified quota header, body=%s", body)
+	}
+	if !strings.Contains(body, "quota-inline-grid") {
+		t.Fatalf("expected inline quota meter layout, body=%s", body)
+	}
+	if !strings.Contains(body, "remaining == null ? \"100%\"") {
+		t.Fatalf("expected unused quota to render as 100 percent, body=%s", body)
+	}
+	if !strings.Contains(body, "plus/team 显示 5H + 7D，free 仅显示 7D") {
+		t.Fatalf("expected plan-specific quota hint, body=%s", body)
+	}
+	if !strings.Contains(body, "quota-table-wrap") {
+		t.Fatalf("expected dedicated quota table wrapper, body=%s", body)
+	}
+	if !strings.Contains(body, "overflow-x: hidden;") {
+		t.Fatalf("expected horizontal scrolling disabled for quota table, body=%s", body)
+	}
+	if !strings.Contains(body, "width: 360px;") {
+		t.Fatalf("expected tightened quota column width for single-screen layout, body=%s", body)
+	}
+	if !strings.Contains(body, ".quota-table th,") {
+		t.Fatalf("expected quota table specific alignment rule, body=%s", body)
+	}
+	if !strings.Contains(body, "align-items: center;") {
+		t.Fatalf("expected centered table content layout, body=%s", body)
+	}
+	if !strings.Contains(body, "class=\"quota-cell\"") {
+		t.Fatalf("expected dedicated quota cell class, body=%s", body)
+	}
+	if !strings.Contains(body, "quota-meter-top") {
+		t.Fatalf("expected horizontal quota meter header, body=%s", body)
+	}
+	if !strings.Contains(body, "grid-template-columns: auto minmax(0, 1fr) auto;") {
+		t.Fatalf("expected horizontal quota meter layout, body=%s", body)
+	}
+	if !strings.Contains(body, "justify-items: stretch;") {
+		t.Fatalf("expected quota cell content to stretch horizontally, body=%s", body)
+	}
+}

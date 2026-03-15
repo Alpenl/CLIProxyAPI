@@ -1,0 +1,237 @@
+package management
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+)
+
+func newCodexManagementTestHandler(t *testing.T) (*Handler, *coreauth.Manager, string) {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+
+	authDir := t.TempDir()
+	cfg := &config.Config{
+		AuthDir: authDir,
+		Port:    8317,
+	}
+	manager := coreauth.NewManager(nil, nil, nil)
+	handler := NewHandlerWithoutConfigFilePath(cfg, manager)
+	handler.tokenStore = &memoryAuthStore{}
+
+	return handler, manager, authDir
+}
+
+func newCodexManagementRouter(h *Handler) *gin.Engine {
+	router := gin.New()
+	router.GET("/v0/management/codex/accounts", h.ListCodexAccounts)
+	router.POST("/v0/management/codex/import-directory", h.ImportCodexDirectory)
+	router.POST("/v0/management/codex/cleanup-invalid", h.CleanupInvalidCodexAccounts)
+	router.DELETE("/v0/management/codex/accounts/:name", h.DeleteCodexAccount)
+	return router
+}
+
+func writeAuthJSONFile(t *testing.T, dir string, name string, payload string) string {
+	t.Helper()
+
+	fullPath := filepath.Join(dir, name)
+	if err := os.WriteFile(fullPath, []byte(payload), 0o600); err != nil {
+		t.Fatalf("failed to write auth file %s: %v", fullPath, err)
+	}
+	return fullPath
+}
+
+func registerAuthFile(t *testing.T, h *Handler, path string) {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read auth file %s: %v", path, err)
+	}
+	if err = h.registerAuthFromFile(context.Background(), path, data); err != nil {
+		t.Fatalf("failed to register auth file %s: %v", path, err)
+	}
+}
+
+func decodeJSONBody(t *testing.T, rr *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+
+	var payload map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+	return payload
+}
+
+func TestCodexManagementListAccounts_FiltersNonCodexProviders(t *testing.T) {
+	handler, _, authDir := newCodexManagementTestHandler(t)
+
+	codexPath := writeAuthJSONFile(t, authDir, "codex-alpha.json", `{"type":"codex","email":"alpha@example.com","refresh_token":"refresh-alpha"}`)
+	geminiPath := writeAuthJSONFile(t, authDir, "gemini-beta.json", `{"type":"gemini","email":"beta@example.com"}`)
+	registerAuthFile(t, handler, codexPath)
+	registerAuthFile(t, handler, geminiPath)
+
+	router := newCodexManagementRouter(handler)
+	req := httptest.NewRequest(http.MethodGet, "/v0/management/codex/accounts", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	payload := decodeJSONBody(t, rr)
+	accountsRaw, ok := payload["accounts"].([]any)
+	if !ok {
+		t.Fatalf("expected accounts array, payload=%#v", payload)
+	}
+	if len(accountsRaw) != 1 {
+		t.Fatalf("expected 1 codex account, got %d", len(accountsRaw))
+	}
+	account, ok := accountsRaw[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected account object, got %#v", accountsRaw[0])
+	}
+	if got := account["name"]; got != "codex-alpha.json" {
+		t.Fatalf("expected codex account name, got %#v", got)
+	}
+}
+
+func TestCodexManagementImportDirectory_ImportsValidCodexFiles(t *testing.T) {
+	handler, manager, authDir := newCodexManagementTestHandler(t)
+
+	sourceDir := t.TempDir()
+	writeAuthJSONFile(t, sourceDir, "codex-first.json", `{"type":"codex","email":"first@example.com","refresh_token":"refresh-first","access_token":"access-first"}`)
+	writeAuthJSONFile(t, sourceDir, "gemini-second.json", `{"type":"gemini","email":"second@example.com"}`)
+	writeAuthJSONFile(t, sourceDir, "broken.json", `{`)
+
+	router := newCodexManagementRouter(handler)
+	body := bytes.NewBufferString(`{"path":"` + sourceDir + `","cleanup_invalid":false}`)
+	req := httptest.NewRequest(http.MethodPost, "/v0/management/codex/import-directory", body)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	payload := decodeJSONBody(t, rr)
+	if got := int(payload["imported"].(float64)); got != 1 {
+		t.Fatalf("expected 1 imported account, got %d", got)
+	}
+	if got := int(payload["skipped"].(float64)); got != 2 {
+		t.Fatalf("expected 2 skipped files, got %d", got)
+	}
+
+	importedPath := filepath.Join(authDir, "codex-first.json")
+	if _, err := os.Stat(importedPath); err != nil {
+		t.Fatalf("expected imported file at %s: %v", importedPath, err)
+	}
+
+	auths := manager.List()
+	if len(auths) != 1 {
+		t.Fatalf("expected 1 registered auth, got %d", len(auths))
+	}
+	if got := auths[0].Provider; got != "codex" {
+		t.Fatalf("expected registered provider codex, got %s", got)
+	}
+}
+
+func TestCodexManagementCleanupInvalid_RemovesBrokenAccounts(t *testing.T) {
+	handler, manager, authDir := newCodexManagementTestHandler(t)
+
+	stalePath := writeAuthJSONFile(t, authDir, "codex-stale.json", `{"type":"codex","email":"stale@example.com","refresh_token":"refresh-stale","access_token":"access-stale"}`)
+	validPath := writeAuthJSONFile(t, authDir, "codex-valid.json", `{"type":"codex","email":"valid@example.com","refresh_token":"refresh-valid","access_token":"access-valid"}`)
+	registerAuthFile(t, handler, stalePath)
+	registerAuthFile(t, handler, validPath)
+
+	handler.codexRefresher = func(_ context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
+		email, _ := auth.Metadata["email"].(string)
+		if email == "stale@example.com" {
+			return nil, errors.New("invalid_grant")
+		}
+		updated := auth.Clone()
+		if updated.Metadata == nil {
+			updated.Metadata = make(map[string]any)
+		}
+		updated.Metadata["access_token"] = "access-valid-refreshed"
+		updated.Metadata["refresh_token"] = "refresh-valid-refreshed"
+		updated.Metadata["last_refresh"] = "2026-03-14T00:00:00Z"
+		return updated, nil
+	}
+
+	router := newCodexManagementRouter(handler)
+	req := httptest.NewRequest(http.MethodPost, "/v0/management/codex/cleanup-invalid", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	payload := decodeJSONBody(t, rr)
+	if got := int(payload["removed"].(float64)); got != 1 {
+		t.Fatalf("expected 1 removed account, got %d", got)
+	}
+	if got := int(payload["refreshed"].(float64)); got != 1 {
+		t.Fatalf("expected 1 refreshed account, got %d", got)
+	}
+
+	if _, err := os.Stat(stalePath); !os.IsNotExist(err) {
+		t.Fatalf("expected stale auth file to be removed, stat err: %v", err)
+	}
+
+	validData, err := os.ReadFile(validPath)
+	if err != nil {
+		t.Fatalf("failed to read refreshed auth file: %v", err)
+	}
+	if !bytes.Contains(validData, []byte(`"access_token":"access-valid-refreshed"`)) {
+		t.Fatalf("expected refreshed auth file to contain updated access token: %s", string(validData))
+	}
+
+	auths := manager.List()
+	if len(auths) != 1 {
+		t.Fatalf("expected 1 remaining auth after cleanup, got %d", len(auths))
+	}
+	if got := auths[0].FileName; got != "codex-valid.json" {
+		t.Fatalf("expected remaining auth codex-valid.json, got %s", got)
+	}
+}
+
+func TestCodexManagementDeleteAccount_RemovesAuthFile(t *testing.T) {
+	handler, manager, authDir := newCodexManagementTestHandler(t)
+
+	authPath := writeAuthJSONFile(t, authDir, "codex-delete.json", `{"type":"codex","email":"delete@example.com","refresh_token":"refresh-delete"}`)
+	registerAuthFile(t, handler, authPath)
+
+	router := newCodexManagementRouter(handler)
+	req := httptest.NewRequest(http.MethodDelete, "/v0/management/codex/accounts/codex-delete.json", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	if _, err := os.Stat(authPath); !os.IsNotExist(err) {
+		t.Fatalf("expected auth file to be removed, stat err: %v", err)
+	}
+	if remaining := manager.List(); len(remaining) != 0 {
+		t.Fatalf("expected auth manager to be empty, got %d entries", len(remaining))
+	}
+}

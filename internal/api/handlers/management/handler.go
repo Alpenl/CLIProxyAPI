@@ -3,6 +3,7 @@
 package management
 
 import (
+	"context"
 	"crypto/subtle"
 	"fmt"
 	"net/http"
@@ -43,6 +44,7 @@ type Handler struct {
 	authManager         *coreauth.Manager
 	usageStats          *usage.RequestStatistics
 	tokenStore          coreauth.Store
+	codexRefresher      func(context.Context, *coreauth.Auth) (*coreauth.Auth, error)
 	localPassword       string
 	allowRemoteOverride bool
 	envSecret           string
@@ -132,6 +134,11 @@ func (h *Handler) SetLogDirectory(dir string) {
 // SetPostAuthHook registers a hook to be called after auth record creation but before persistence.
 func (h *Handler) SetPostAuthHook(hook coreauth.PostAuthHook) {
 	h.postAuthHook = hook
+}
+
+// SetCodexRefresher overrides the default Codex refresh behavior, primarily for tests.
+func (h *Handler) SetCodexRefresher(fn func(context.Context, *coreauth.Auth) (*coreauth.Auth, error)) {
+	h.codexRefresher = fn
 }
 
 // Middleware enforces access control for management endpoints.
