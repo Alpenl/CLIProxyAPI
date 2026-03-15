@@ -449,3 +449,18 @@ func TestManagementControlPanel_ServesEmbeddedCodexUI(t *testing.T) {
 		t.Fatalf("expected quota cell content to stretch horizontally, body=%s", body)
 	}
 }
+
+func TestRootRedirectsToManagementControlPanel(t *testing.T) {
+	server := newTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	server.engine.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusTemporaryRedirect, rr.Code, rr.Body.String())
+	}
+	if got := rr.Header().Get("Location"); got != "/management.html" {
+		t.Fatalf("expected redirect location %q, got %q", "/management.html", got)
+	}
+}
