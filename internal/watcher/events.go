@@ -16,16 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func matchProvider(provider string, targets []string) (string, bool) {
-	p := strings.ToLower(strings.TrimSpace(provider))
-	for _, t := range targets {
-		if strings.EqualFold(p, strings.TrimSpace(t)) {
-			return p, true
-		}
-	}
-	return p, false
-}
-
 func (w *Watcher) start(ctx context.Context) error {
 	if errAddConfig := w.watcher.Add(w.configPath); errAddConfig != nil {
 		log.Errorf("failed to watch config file %s: %v", w.configPath, errAddConfig)
@@ -41,7 +31,7 @@ func (w *Watcher) start(ctx context.Context) error {
 
 	go w.processEvents(ctx)
 
-	w.reloadClients(true, nil, false)
+	w.reloadClients(true, false)
 	return nil
 }
 

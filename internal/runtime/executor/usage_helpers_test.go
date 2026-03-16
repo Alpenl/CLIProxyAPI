@@ -1,6 +1,10 @@
 package executor
 
-import "testing"
+import (
+	"testing"
+
+	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+)
 
 func TestParseOpenAIUsageChatCompletions(t *testing.T) {
 	data := []byte(`{"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3,"prompt_tokens_details":{"cached_tokens":4},"completion_tokens_details":{"reasoning_tokens":5}}}`)
@@ -39,5 +43,26 @@ func TestParseOpenAIUsageResponses(t *testing.T) {
 	}
 	if detail.ReasoningTokens != 9 {
 		t.Fatalf("reasoning tokens = %d, want %d", detail.ReasoningTokens, 9)
+	}
+}
+
+func TestResolveUsageSourceIgnoresRemovedProviderShortcuts(t *testing.T) {
+	t.Parallel()
+
+	geminiCLI := &cliproxyauth.Auth{
+		ID:       "legacy-gemini-auth",
+		Provider: "gemini-cli",
+	}
+	if got := resolveUsageSource(geminiCLI, ""); got != "" {
+		t.Fatalf("resolveUsageSource(gemini-cli) = %q, want empty", got)
+	}
+
+	vertex := &cliproxyauth.Auth{
+		ID:       "legacy-vertex-auth",
+		Provider: "vertex",
+		Metadata: map[string]any{"project_id": "legacy-project"},
+	}
+	if got := resolveUsageSource(vertex, ""); got != "" {
+		t.Fatalf("resolveUsageSource(vertex) = %q, want empty", got)
 	}
 }

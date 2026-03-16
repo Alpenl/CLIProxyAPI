@@ -14,22 +14,18 @@ func TestGetRequestDetails_PreservesSuffix(t *testing.T) {
 	modelRegistry := registry.GetGlobalRegistry()
 	now := time.Now().Unix()
 
-	modelRegistry.RegisterClient("test-request-details-gemini", "gemini", []*registry.ModelInfo{
-		{ID: "gemini-2.5-pro", Created: now + 30},
-		{ID: "gemini-2.5-flash", Created: now + 25},
-	})
-	modelRegistry.RegisterClient("test-request-details-openai", "openai", []*registry.ModelInfo{
+	modelRegistry.RegisterClient("test-request-details-codex-primary", "codex", []*registry.ModelInfo{
+		{ID: "gpt-5.3-codex", Created: now + 30},
 		{ID: "gpt-5.2", Created: now + 20},
 	})
-	modelRegistry.RegisterClient("test-request-details-claude", "claude", []*registry.ModelInfo{
-		{ID: "claude-sonnet-4-5", Created: now + 5},
+	modelRegistry.RegisterClient("test-request-details-codex-secondary", "codex", []*registry.ModelInfo{
+		{ID: "gpt-5-codex-mini", Created: now + 10},
 	})
 
 	// Ensure cleanup of all test registrations.
 	clientIDs := []string{
-		"test-request-details-gemini",
-		"test-request-details-openai",
-		"test-request-details-claude",
+		"test-request-details-codex-primary",
+		"test-request-details-codex-secondary",
 	}
 	for _, clientID := range clientIDs {
 		id := clientID
@@ -49,23 +45,23 @@ func TestGetRequestDetails_PreservesSuffix(t *testing.T) {
 	}{
 		{
 			name:          "numeric suffix preserved",
-			inputModel:    "gemini-2.5-pro(8192)",
-			wantProviders: []string{"gemini"},
-			wantModel:     "gemini-2.5-pro(8192)",
+			inputModel:    "gpt-5.2(8192)",
+			wantProviders: []string{"codex"},
+			wantModel:     "gpt-5.2(8192)",
 			wantErr:       false,
 		},
 		{
 			name:          "level suffix preserved",
 			inputModel:    "gpt-5.2(high)",
-			wantProviders: []string{"openai"},
+			wantProviders: []string{"codex"},
 			wantModel:     "gpt-5.2(high)",
 			wantErr:       false,
 		},
 		{
 			name:          "no suffix unchanged",
-			inputModel:    "claude-sonnet-4-5",
-			wantProviders: []string{"claude"},
-			wantModel:     "claude-sonnet-4-5",
+			inputModel:    "gpt-5-codex-mini",
+			wantProviders: []string{"codex"},
+			wantModel:     "gpt-5-codex-mini",
 			wantErr:       false,
 		},
 		{
@@ -78,22 +74,22 @@ func TestGetRequestDetails_PreservesSuffix(t *testing.T) {
 		{
 			name:          "auto suffix resolved",
 			inputModel:    "auto(high)",
-			wantProviders: []string{"gemini"},
-			wantModel:     "gemini-2.5-pro(high)",
+			wantProviders: []string{"codex"},
+			wantModel:     "gpt-5.3-codex(high)",
 			wantErr:       false,
 		},
 		{
 			name:          "special suffix none preserved",
-			inputModel:    "gemini-2.5-flash(none)",
-			wantProviders: []string{"gemini"},
-			wantModel:     "gemini-2.5-flash(none)",
+			inputModel:    "gpt-5.2(none)",
+			wantProviders: []string{"codex"},
+			wantModel:     "gpt-5.2(none)",
 			wantErr:       false,
 		},
 		{
 			name:          "special suffix auto preserved",
-			inputModel:    "claude-sonnet-4-5(auto)",
-			wantProviders: []string{"claude"},
-			wantModel:     "claude-sonnet-4-5(auto)",
+			inputModel:    "gpt-5.3-codex(auto)",
+			wantProviders: []string{"codex"},
+			wantModel:     "gpt-5.3-codex(auto)",
 			wantErr:       false,
 		},
 	}

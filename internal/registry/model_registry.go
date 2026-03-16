@@ -15,7 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// ModelInfo represents information about an available model
+// ModelInfo represents information about an available model.
 type ModelInfo struct {
 	// ID is the unique identifier for the model
 	ID string `json:"id"`
@@ -25,11 +25,11 @@ type ModelInfo struct {
 	Created int64 `json:"created"`
 	// OwnedBy indicates the organization that owns the model
 	OwnedBy string `json:"owned_by"`
-	// Type indicates the model type (e.g., "claude", "gemini", "openai")
+	// Type indicates the upstream model family.
 	Type string `json:"type"`
 	// DisplayName is the human-readable name for the model
 	DisplayName string `json:"display_name,omitempty"`
-	// Name is used for Gemini-style model names
+	// Name is an alternate upstream model name when needed by static metadata.
 	Name string `json:"name,omitempty"`
 	// Version is the model version
 	Version string `json:"version,omitempty"`
@@ -39,7 +39,7 @@ type ModelInfo struct {
 	InputTokenLimit int `json:"inputTokenLimit,omitempty"`
 	// OutputTokenLimit is the maximum output token limit
 	OutputTokenLimit int `json:"outputTokenLimit,omitempty"`
-	// SupportedGenerationMethods lists supported generation methods
+	// SupportedGenerationMethods lists supported generation methods.
 	SupportedGenerationMethods []string `json:"supportedGenerationMethods,omitempty"`
 	// ContextLength is the context window size
 	ContextLength int `json:"context_length,omitempty"`
@@ -52,13 +52,10 @@ type ModelInfo struct {
 	// SupportedOutputModalities lists supported output modalities (e.g., TEXT, IMAGE)
 	SupportedOutputModalities []string `json:"supportedOutputModalities,omitempty"`
 
-	// Thinking holds provider-specific reasoning/thinking budget capabilities.
-	// This is optional and currently used for Gemini thinking budget normalization.
+	// Thinking holds model-specific reasoning budget capabilities.
 	Thinking *ThinkingSupport `json:"thinking,omitempty"`
 
-	// UserDefined indicates this model was defined through config file's models[]
-	// array (e.g., openai-compatibility.*.models[], *-api-key.models[]).
-	// UserDefined models have thinking configuration passed through without validation.
+	// UserDefined indicates this model was defined through config file aliases.
 	UserDefined bool `json:"-"`
 }
 
@@ -227,7 +224,7 @@ func (r *ModelRegistry) triggerModelsUnregistered(provider, clientID string) {
 // RegisterClient registers a client and its supported models
 // Parameters:
 //   - clientID: Unique identifier for the client
-//   - clientProvider: Provider name (e.g., "gemini", "claude", "openai")
+//   - clientProvider: Provider name (for this branch typically "codex")
 //   - models: List of models that this client can provide
 func (r *ModelRegistry) RegisterClient(clientID, clientProvider string, models []*ModelInfo) {
 	r.mutex.Lock()
@@ -749,9 +746,8 @@ func (r *ModelRegistry) ClientSupportsModel(clientID, modelID string) bool {
 	return false
 }
 
-// GetAvailableModels returns all models that have at least one available client
-// Parameters:
-//   - handlerType: The handler type to filter models for (e.g., "openai", "claude", "gemini")
+// GetAvailableModels returns all models that have at least one available client.
+// handlerType is currently expected to be an OpenAI-compatible handler key.
 //
 // Returns:
 //   - []map[string]any: List of available models in the requested format
@@ -870,8 +866,6 @@ func cloneModelMapValue(value any) any {
 }
 
 // GetAvailableModelsByProvider returns models available for the given provider identifier.
-// Parameters:
-//   - provider: Provider identifier (e.g., "codex", "gemini", "antigravity")
 //
 // Returns:
 //   - []*ModelInfo: List of available models for the provider
@@ -1104,7 +1098,7 @@ func (r *ModelRegistry) GetModelInfo(modelID, provider string) *ModelInfo {
 	return nil
 }
 
-// convertModelToMap converts ModelInfo to the appropriate format for different handler types
+// convertModelToMap converts ModelInfo to the appropriate handler format.
 func (r *ModelRegistry) convertModelToMap(model *ModelInfo, handlerType string) map[string]any {
 	if model == nil {
 		return nil
@@ -1140,56 +1134,6 @@ func (r *ModelRegistry) convertModelToMap(model *ModelInfo, handlerType string) 
 		}
 		if len(model.SupportedParameters) > 0 {
 			result["supported_parameters"] = append([]string(nil), model.SupportedParameters...)
-		}
-		return result
-
-	case "claude":
-		result := map[string]any{
-			"id":       model.ID,
-			"object":   "model",
-			"owned_by": model.OwnedBy,
-		}
-		if model.Created > 0 {
-			result["created_at"] = model.Created
-		}
-		if model.Type != "" {
-			result["type"] = "model"
-		}
-		if model.DisplayName != "" {
-			result["display_name"] = model.DisplayName
-		}
-		return result
-
-	case "gemini":
-		result := map[string]any{}
-		if model.Name != "" {
-			result["name"] = model.Name
-		} else {
-			result["name"] = model.ID
-		}
-		if model.Version != "" {
-			result["version"] = model.Version
-		}
-		if model.DisplayName != "" {
-			result["displayName"] = model.DisplayName
-		}
-		if model.Description != "" {
-			result["description"] = model.Description
-		}
-		if model.InputTokenLimit > 0 {
-			result["inputTokenLimit"] = model.InputTokenLimit
-		}
-		if model.OutputTokenLimit > 0 {
-			result["outputTokenLimit"] = model.OutputTokenLimit
-		}
-		if len(model.SupportedGenerationMethods) > 0 {
-			result["supportedGenerationMethods"] = append([]string(nil), model.SupportedGenerationMethods...)
-		}
-		if len(model.SupportedInputModalities) > 0 {
-			result["supportedInputModalities"] = append([]string(nil), model.SupportedInputModalities...)
-		}
-		if len(model.SupportedOutputModalities) > 0 {
-			result["supportedOutputModalities"] = append([]string(nil), model.SupportedOutputModalities...)
 		}
 		return result
 
@@ -1239,7 +1183,7 @@ func (r *ModelRegistry) CleanupExpiredQuotas() {
 // available clients that are not suspended or over quota.
 //
 // Parameters:
-//   - handlerType: The API handler type (e.g., "openai", "claude", "gemini")
+//   - handlerType: The API handler type (for example "openai")
 //
 // Returns:
 //   - string: The model ID of the first available model, or empty string if none available

@@ -7,9 +7,6 @@ import (
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
 )
 
-// RequestedModelMetadataKey stores the client-requested model name in Options.Metadata.
-const RequestedModelMetadataKey = "requested_model"
-
 const (
 	// PinnedAuthMetadataKey locks execution to a specific auth ID.
 	PinnedAuthMetadataKey = "pinned_auth_id"

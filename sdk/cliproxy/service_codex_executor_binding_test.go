@@ -62,3 +62,24 @@ func TestEnsureExecutorsForAuthWithMode_CodexForceReplace(t *testing.T) {
 		t.Fatal("expected codex executor replacement in force mode")
 	}
 }
+
+func TestEnsureExecutorsForAuth_IgnoresNonCodexProvider(t *testing.T) {
+	service := &Service{
+		cfg:         &config.Config{},
+		coreManager: coreauth.NewManager(nil, nil, nil),
+	}
+	auth := &coreauth.Auth{
+		ID:       "gemini-auth-1",
+		Provider: "gemini",
+		Status:   coreauth.StatusActive,
+	}
+
+	service.ensureExecutorsForAuth(auth)
+
+	if _, ok := service.coreManager.Executor("gemini"); ok {
+		t.Fatal("expected non-codex provider executor to remain unregistered")
+	}
+	if _, ok := service.coreManager.Executor("codex"); ok {
+		t.Fatal("expected no codex executor to be registered for non-codex auth")
+	}
+}

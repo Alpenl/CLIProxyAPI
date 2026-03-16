@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
 )
+
+var lastRefreshKeys = []string{"last_refresh", "lastRefresh", "last_refreshed_at", "lastRefreshedAt"}
 
 func (h *Handler) buildAuthFileEntry(auth *coreauth.Auth) gin.H {
 	if auth == nil {
@@ -167,6 +170,56 @@ func isRuntimeOnlyAuth(auth *coreauth.Auth) bool {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(auth.Attributes["runtime_only"]), "true")
+}
+
+func extractLastRefreshTimestamp(meta map[string]any) (time.Time, bool) {
+	if len(meta) == 0 {
+		return time.Time{}, false
+	}
+	for _, key := range lastRefreshKeys {
+		if val, ok := meta[key]; ok {
+			if ts, ok := parseLastRefreshValue(val); ok {
+				return ts, true
+			}
+		}
+	}
+	return time.Time{}, false
+}
+
+func parseLastRefreshValue(v any) (time.Time, bool) {
+	switch val := v.(type) {
+	case string:
+		s := strings.TrimSpace(val)
+		if s == "" {
+			return time.Time{}, false
+		}
+		layouts := []string{time.RFC3339, time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05Z07:00"}
+		for _, layout := range layouts {
+			if ts, err := time.Parse(layout, s); err == nil {
+				return ts.UTC(), true
+			}
+		}
+		if unix, err := strconv.ParseInt(s, 10, 64); err == nil && unix > 0 {
+			return time.Unix(unix, 0).UTC(), true
+		}
+	case float64:
+		if val > 0 {
+			return time.Unix(int64(val), 0).UTC(), true
+		}
+	case int64:
+		if val > 0 {
+			return time.Unix(val, 0).UTC(), true
+		}
+	case int:
+		if val > 0 {
+			return time.Unix(int64(val), 0).UTC(), true
+		}
+	case json.Number:
+		if i, err := val.Int64(); err == nil && i > 0 {
+			return time.Unix(i, 0).UTC(), true
+		}
+	}
+	return time.Time{}, false
 }
 
 func (h *Handler) findAuthForDelete(name string) *coreauth.Auth {

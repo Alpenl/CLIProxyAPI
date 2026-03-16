@@ -62,3 +62,36 @@ func TestCodexExecutorCacheHelper_OpenAIChatCompletions_StablePromptCacheKeyFrom
 		t.Fatalf("prompt_cache_key (second call) = %q, want %q", gotKey2, expectedKey)
 	}
 }
+
+func TestCodexExecutorCacheHelperIgnoresUnsupportedSourceFormat(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(recorder)
+	ctx := context.WithValue(context.Background(), "gin", ginCtx)
+
+	executor := &CodexExecutor{}
+	rawJSON := []byte(`{"model":"gpt-5.3-codex","stream":true}`)
+	req := cliproxyexecutor.Request{
+		Model:   "gpt-5.3-codex",
+		Payload: []byte(`{"metadata":{"user_id":"legacy-user"}}`),
+	}
+
+	httpReq, err := executor.cacheHelper(ctx, sdktranslator.Format("claude"), "https://example.com/responses", req, rawJSON)
+	if err != nil {
+		t.Fatalf("cacheHelper error: %v", err)
+	}
+
+	body, errRead := io.ReadAll(httpReq.Body)
+	if errRead != nil {
+		t.Fatalf("read request body: %v", errRead)
+	}
+
+	if promptCacheKey := gjson.GetBytes(body, "prompt_cache_key"); promptCacheKey.Exists() {
+		t.Fatalf("prompt_cache_key = %q, want no prompt cache key for unsupported source format", promptCacheKey.String())
+	}
+	if gotConversation := httpReq.Header.Get("Conversation_id"); gotConversation != "" {
+		t.Fatalf("Conversation_id = %q, want empty", gotConversation)
+	}
+	if gotSession := httpReq.Header.Get("Session_id"); gotSession != "" {
+		t.Fatalf("Session_id = %q, want empty", gotSession)
+	}
+}

@@ -136,9 +136,8 @@ func (h *OpenAIResponsesAPIHandler) Compact(c *gin.Context) {
 	cliCancel()
 }
 
-// handleNonStreamingResponse handles non-streaming chat completion responses
-// for Gemini models. It selects a client from the pool, sends the request, and
-// aggregates the response before sending it back to the client in OpenAIResponses format.
+// handleNonStreamingResponse handles non-streaming requests for the OpenAI
+// Responses-compatible API surface.
 //
 // Parameters:
 //   - c: The Gin context containing the HTTP request and response
@@ -162,9 +161,8 @@ func (h *OpenAIResponsesAPIHandler) handleNonStreamingResponse(c *gin.Context, r
 	cliCancel()
 }
 
-// handleStreamingResponse handles streaming responses for Gemini models.
-// It establishes a streaming connection with the backend service and forwards
-// the response chunks to the client in real-time using Server-Sent Events.
+// handleStreamingResponse handles streaming requests for the OpenAI Responses-
+// compatible API surface.
 //
 // Parameters:
 //   - c: The Gin context containing the HTTP request and response

@@ -1,51 +1,14 @@
-// Package registry provides model definitions and lookup helpers for various AI providers.
-// Static model metadata is loaded from the embedded models.json file and can be refreshed from network.
+// Package registry provides model definitions and lookup helpers for Codex model tiers.
 package registry
 
-import (
-	"strings"
-)
+import "strings"
 
-// staticModelsJSON mirrors the top-level structure of models.json.
+// staticModelsJSON mirrors the Codex sections of models.json.
 type staticModelsJSON struct {
-	Claude      []*ModelInfo `json:"claude"`
-	Gemini      []*ModelInfo `json:"gemini"`
-	Vertex      []*ModelInfo `json:"vertex"`
-	GeminiCLI   []*ModelInfo `json:"gemini-cli"`
-	AIStudio    []*ModelInfo `json:"aistudio"`
-	CodexFree   []*ModelInfo `json:"codex-free"`
-	CodexTeam   []*ModelInfo `json:"codex-team"`
-	CodexPlus   []*ModelInfo `json:"codex-plus"`
-	CodexPro    []*ModelInfo `json:"codex-pro"`
-	Qwen        []*ModelInfo `json:"qwen"`
-	IFlow       []*ModelInfo `json:"iflow"`
-	Kimi        []*ModelInfo `json:"kimi"`
-	Antigravity []*ModelInfo `json:"antigravity"`
-}
-
-// GetClaudeModels returns the standard Claude model definitions.
-func GetClaudeModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Claude)
-}
-
-// GetGeminiModels returns the standard Gemini model definitions.
-func GetGeminiModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Gemini)
-}
-
-// GetGeminiVertexModels returns Gemini model definitions for Vertex AI.
-func GetGeminiVertexModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Vertex)
-}
-
-// GetGeminiCLIModels returns Gemini model definitions for the Gemini CLI.
-func GetGeminiCLIModels() []*ModelInfo {
-	return cloneModelInfos(getModels().GeminiCLI)
-}
-
-// GetAIStudioModels returns model definitions for AI Studio.
-func GetAIStudioModels() []*ModelInfo {
-	return cloneModelInfos(getModels().AIStudio)
+	CodexFree []*ModelInfo `json:"codex-free"`
+	CodexTeam []*ModelInfo `json:"codex-team"`
+	CodexPlus []*ModelInfo `json:"codex-plus"`
+	CodexPro  []*ModelInfo `json:"codex-pro"`
 }
 
 // GetCodexFreeModels returns model definitions for the Codex free plan tier.
@@ -68,27 +31,6 @@ func GetCodexProModels() []*ModelInfo {
 	return cloneModelInfos(getModels().CodexPro)
 }
 
-// GetQwenModels returns the standard Qwen model definitions.
-func GetQwenModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Qwen)
-}
-
-// GetIFlowModels returns the standard iFlow model definitions.
-func GetIFlowModels() []*ModelInfo {
-	return cloneModelInfos(getModels().IFlow)
-}
-
-// GetKimiModels returns the standard Kimi (Moonshot AI) model definitions.
-func GetKimiModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Kimi)
-}
-
-// GetAntigravityModels returns the standard Antigravity model definitions.
-func GetAntigravityModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Antigravity)
-}
-
-// cloneModelInfos returns a shallow copy of the slice with each element deep-cloned.
 func cloneModelInfos(models []*ModelInfo) []*ModelInfo {
 	if len(models) == 0 {
 		return nil
@@ -101,48 +43,15 @@ func cloneModelInfos(models []*ModelInfo) []*ModelInfo {
 }
 
 // GetStaticModelDefinitionsByChannel returns static model definitions for a given channel/provider.
-// It returns nil when the channel is unknown.
-//
-// Supported channels:
-//   - claude
-//   - gemini
-//   - vertex
-//   - gemini-cli
-//   - aistudio
-//   - codex
-//   - qwen
-//   - iflow
-//   - kimi
-//   - antigravity
+// Only the Codex channel remains supported.
 func GetStaticModelDefinitionsByChannel(channel string) []*ModelInfo {
-	key := strings.ToLower(strings.TrimSpace(channel))
-	switch key {
-	case "claude":
-		return GetClaudeModels()
-	case "gemini":
-		return GetGeminiModels()
-	case "vertex":
-		return GetGeminiVertexModels()
-	case "gemini-cli":
-		return GetGeminiCLIModels()
-	case "aistudio":
-		return GetAIStudioModels()
-	case "codex":
+	if strings.EqualFold(strings.TrimSpace(channel), "codex") {
 		return GetCodexProModels()
-	case "qwen":
-		return GetQwenModels()
-	case "iflow":
-		return GetIFlowModels()
-	case "kimi":
-		return GetKimiModels()
-	case "antigravity":
-		return GetAntigravityModels()
-	default:
-		return nil
 	}
+	return nil
 }
 
-// LookupStaticModelInfo searches all static model definitions for a model by ID.
+// LookupStaticModelInfo searches Codex static model definitions for a model by ID.
 // Returns nil if no matching model is found.
 func LookupStaticModelInfo(modelID string) *ModelInfo {
 	if modelID == "" {
@@ -151,16 +60,10 @@ func LookupStaticModelInfo(modelID string) *ModelInfo {
 
 	data := getModels()
 	allModels := [][]*ModelInfo{
-		data.Claude,
-		data.Gemini,
-		data.Vertex,
-		data.GeminiCLI,
-		data.AIStudio,
+		data.CodexFree,
+		data.CodexTeam,
+		data.CodexPlus,
 		data.CodexPro,
-		data.Qwen,
-		data.IFlow,
-		data.Kimi,
-		data.Antigravity,
 	}
 	for _, models := range allModels {
 		for _, m := range models {

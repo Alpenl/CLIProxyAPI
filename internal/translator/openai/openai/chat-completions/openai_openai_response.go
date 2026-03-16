@@ -1,8 +1,5 @@
-// Package openai provides response translation functionality for Gemini CLI to OpenAI API compatibility.
-// This package handles the conversion of Gemini CLI API responses into OpenAI Chat Completions-compatible
-// JSON format, transforming streaming events and non-streaming responses into the format
-// expected by OpenAI API clients. It supports both streaming and non-streaming modes,
-// handling text content, tool calls, reasoning content, and usage metadata appropriately.
+// Package chat_completions provides passthrough response translation for the
+// proxy's OpenAI Chat Completions compatibility layer.
 package chat_completions
 
 import (
@@ -10,16 +7,13 @@ import (
 	"context"
 )
 
-// ConvertOpenAIResponseToOpenAI translates a single chunk of a streaming response from the
-// Gemini CLI API format to the OpenAI Chat Completions streaming format.
-// It processes various Gemini CLI event types and transforms them into OpenAI-compatible JSON responses.
-// The function handles text content, tool calls, reasoning content, and usage metadata, outputting
-// responses that match the OpenAI API format. It supports incremental updates for streaming responses.
+// ConvertOpenAIResponseToOpenAI normalizes one streaming chunk for the OpenAI
+// Chat Completions response path.
 //
 // Parameters:
 //   - ctx: The context for the request, used for cancellation and timeout handling
 //   - modelName: The name of the model being used for the response (unused in current implementation)
-//   - rawJSON: The raw JSON response from the Gemini CLI API
+//   - rawJSON: The raw upstream response chunk
 //   - param: A pointer to a parameter object for maintaining state between calls
 //
 // Returns:
@@ -34,15 +28,13 @@ func ConvertOpenAIResponseToOpenAI(_ context.Context, _ string, originalRequestR
 	return []string{string(rawJSON)}
 }
 
-// ConvertOpenAIResponseToOpenAINonStream converts a non-streaming Gemini CLI response to a non-streaming OpenAI response.
-// This function processes the complete Gemini CLI response and transforms it into a single OpenAI-compatible
-// JSON response. It handles message content, tool calls, reasoning content, and usage metadata, combining all
-// the information into a single response that matches the OpenAI API format.
+// ConvertOpenAIResponseToOpenAINonStream returns the normalized non-streaming
+// response payload for the OpenAI Chat Completions path.
 //
 // Parameters:
 //   - ctx: The context for the request, used for cancellation and timeout handling
 //   - modelName: The name of the model being used for the response
-//   - rawJSON: The raw JSON response from the Gemini CLI API
+//   - rawJSON: The raw upstream response payload
 //   - param: A pointer to a parameter object for the conversion
 //
 // Returns:

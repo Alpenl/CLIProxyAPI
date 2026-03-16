@@ -204,19 +204,10 @@ func detectChangedProviders(oldData, newData *staticModelsJSON) []string {
 	}
 
 	sections := []section{
-		{"claude", oldData.Claude, newData.Claude},
-		{"gemini", oldData.Gemini, newData.Gemini},
-		{"vertex", oldData.Vertex, newData.Vertex},
-		{"gemini-cli", oldData.GeminiCLI, newData.GeminiCLI},
-		{"aistudio", oldData.AIStudio, newData.AIStudio},
 		{"codex", oldData.CodexFree, newData.CodexFree},
 		{"codex", oldData.CodexTeam, newData.CodexTeam},
 		{"codex", oldData.CodexPlus, newData.CodexPlus},
 		{"codex", oldData.CodexPro, newData.CodexPro},
-		{"qwen", oldData.Qwen, newData.Qwen},
-		{"iflow", oldData.IFlow, newData.IFlow},
-		{"kimi", oldData.Kimi, newData.Kimi},
-		{"antigravity", oldData.Antigravity, newData.Antigravity},
 	}
 
 	seen := make(map[string]bool, len(sections))
@@ -326,19 +317,10 @@ func validateModelsCatalog(data *staticModelsJSON) error {
 		name   string
 		models []*ModelInfo
 	}{
-		{name: "claude", models: data.Claude},
-		{name: "gemini", models: data.Gemini},
-		{name: "vertex", models: data.Vertex},
-		{name: "gemini-cli", models: data.GeminiCLI},
-		{name: "aistudio", models: data.AIStudio},
 		{name: "codex-free", models: data.CodexFree},
 		{name: "codex-team", models: data.CodexTeam},
 		{name: "codex-plus", models: data.CodexPlus},
 		{name: "codex-pro", models: data.CodexPro},
-		{name: "qwen", models: data.Qwen},
-		{name: "iflow", models: data.IFlow},
-		{name: "kimi", models: data.Kimi},
-		{name: "antigravity", models: data.Antigravity},
 	}
 
 	for _, section := range requiredSections {

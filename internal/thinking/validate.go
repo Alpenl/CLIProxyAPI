@@ -54,8 +54,7 @@ func ValidateConfig(config ThinkingConfig, modelInfo *registry.ModelInfo, fromFo
 	}
 
 	// allowClampUnsupported determines whether to clamp unsupported levels instead of returning an error.
-	// This applies when crossing provider families (e.g., openai→gemini, claude→gemini) and the target
-	// model supports discrete levels. Same-family conversions require strict validation.
+	// This applies when crossing supported request schemas inside the remaining OpenAI/Codex family.
 	toCapability := detectModelCapability(modelInfo)
 	toHasLevelSupport := toCapability == CapabilityLevelOnly || toCapability == CapabilityHybrid
 	allowClampUnsupported := toHasLevelSupport && !isSameProviderFamily(fromFormat, toFormat)
@@ -143,22 +142,15 @@ func ValidateConfig(config ThinkingConfig, modelInfo *registry.ModelInfo, fromFo
 		config = convertAutoToMidRange(config, support, toFormat, model)
 	}
 
-	if config.Mode == ModeNone && toFormat == "claude" {
-		// Claude supports explicit disable via thinking.type="disabled".
-		// Keep Budget=0 so applier can omit budget_tokens.
-		config.Budget = 0
-		config.Level = ""
-	} else {
-		switch config.Mode {
-		case ModeBudget, ModeAuto, ModeNone:
-			config.Budget = clampBudget(config.Budget, modelInfo, toFormat)
-		}
+	switch config.Mode {
+	case ModeBudget, ModeAuto, ModeNone:
+		config.Budget = clampBudget(config.Budget, modelInfo, toFormat)
+	}
 
-		// ModeNone with clamped Budget > 0: set Level to lowest for Level-only/Hybrid models
-		// This ensures Apply layer doesn't need to access support.Levels
-		if config.Mode == ModeNone && config.Budget > 0 && len(support.Levels) > 0 {
-			config.Level = ThinkingLevel(support.Levels[0])
-		}
+	// ModeNone with clamped Budget > 0: set Level to lowest for Level-only/Hybrid models.
+	// This ensures Apply layer doesn't need to access support.Levels.
+	if config.Mode == ModeNone && config.Budget > 0 && len(support.Levels) > 0 {
+		config.Level = ThinkingLevel(support.Levels[0])
 	}
 
 	return &config, nil
@@ -335,26 +327,6 @@ func normalizeLevels(levels []string) []string {
 	return out
 }
 
-// isBudgetCapableProvider returns true if the provider supports budget-based thinking.
-// These providers may also support level-based thinking (hybrid models).
-func isBudgetCapableProvider(provider string) bool {
-	switch provider {
-	case "gemini", "gemini-cli", "antigravity", "claude":
-		return true
-	default:
-		return false
-	}
-}
-
-func isGeminiFamily(provider string) bool {
-	switch provider {
-	case "gemini", "gemini-cli", "antigravity":
-		return true
-	default:
-		return false
-	}
-}
-
 func isOpenAIFamily(provider string) bool {
 	switch provider {
 	case "openai", "openai-response", "codex":
@@ -368,8 +340,7 @@ func isSameProviderFamily(from, to string) bool {
 	if from == to {
 		return true
 	}
-	return (isGeminiFamily(from) && isGeminiFamily(to)) ||
-		(isOpenAIFamily(from) && isOpenAIFamily(to))
+	return isOpenAIFamily(from) && isOpenAIFamily(to)
 }
 
 func abs(x int) int {

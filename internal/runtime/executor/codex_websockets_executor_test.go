@@ -9,7 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
+	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
 	"github.com/tidwall/gjson"
 )
 
@@ -43,6 +45,25 @@ func TestApplyCodexWebsocketHeadersDefaultsToCurrentResponsesBeta(t *testing.T) 
 	}
 	if got := headers.Get("x-codex-beta-features"); got != "" {
 		t.Fatalf("x-codex-beta-features = %q, want empty", got)
+	}
+}
+
+func TestApplyCodexPromptCacheHeadersIgnoresUnsupportedSourceFormat(t *testing.T) {
+	req := cliproxyexecutor.Request{
+		Model:   "gpt-5-codex",
+		Payload: []byte(`{"metadata":{"user_id":"legacy-user"}}`),
+	}
+
+	body, headers := applyCodexPromptCacheHeaders(sdktranslator.Format("claude"), req, []byte(`{"model":"gpt-5-codex"}`))
+
+	if promptCacheKey := gjson.GetBytes(body, "prompt_cache_key"); promptCacheKey.Exists() {
+		t.Fatalf("prompt_cache_key = %q, want no prompt cache key for unsupported source format", promptCacheKey.String())
+	}
+	if got := headers.Get("Conversation_id"); got != "" {
+		t.Fatalf("Conversation_id = %q, want empty", got)
+	}
+	if got := headers.Get("Session_id"); got != "" {
+		t.Fatalf("Session_id = %q, want empty", got)
 	}
 }
 

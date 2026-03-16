@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -194,38 +191,9 @@ func (s *FileTokenStore) readAuthFile(path, baseDir string) (*cliproxyauth.Auth,
 		return nil, fmt.Errorf("unmarshal auth json: %w", err)
 	}
 	provider, _ := metadata["type"].(string)
-	if provider == "" {
-		provider = "unknown"
-	}
-	if provider == "antigravity" || provider == "gemini" {
-		projectID := ""
-		if pid, ok := metadata["project_id"].(string); ok {
-			projectID = strings.TrimSpace(pid)
-		}
-		if projectID == "" {
-			accessToken := extractAccessToken(metadata)
-			// For gemini type, the stored access_token is likely expired (~1h lifetime).
-			// Refresh it using the long-lived refresh_token before querying.
-			if provider == "gemini" {
-				if tokenMap, ok := metadata["token"].(map[string]any); ok {
-					if refreshed, errRefresh := refreshGeminiAccessToken(tokenMap, http.DefaultClient); errRefresh == nil {
-						accessToken = refreshed
-					}
-				}
-			}
-			if accessToken != "" {
-				fetchedProjectID, errFetch := FetchAntigravityProjectID(context.Background(), accessToken, http.DefaultClient)
-				if errFetch == nil && strings.TrimSpace(fetchedProjectID) != "" {
-					metadata["project_id"] = strings.TrimSpace(fetchedProjectID)
-					if raw, errMarshal := json.Marshal(metadata); errMarshal == nil {
-						if file, errOpen := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0o600); errOpen == nil {
-							_, _ = file.Write(raw)
-							_ = file.Close()
-						}
-					}
-				}
-			}
-		}
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider != "codex" {
+		return nil, nil
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -338,51 +306,6 @@ func extractAccessToken(metadata map[string]any) string {
 		}
 	}
 	return ""
-}
-
-func refreshGeminiAccessToken(tokenMap map[string]any, httpClient *http.Client) (string, error) {
-	refreshToken, _ := tokenMap["refresh_token"].(string)
-	clientID, _ := tokenMap["client_id"].(string)
-	clientSecret, _ := tokenMap["client_secret"].(string)
-	tokenURI, _ := tokenMap["token_uri"].(string)
-
-	if refreshToken == "" || clientID == "" || clientSecret == "" {
-		return "", fmt.Errorf("missing refresh credentials")
-	}
-	if tokenURI == "" {
-		tokenURI = "https://oauth2.googleapis.com/token"
-	}
-
-	data := url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {refreshToken},
-		"client_id":     {clientID},
-		"client_secret": {clientSecret},
-	}
-
-	resp, err := httpClient.PostForm(tokenURI, data)
-	if err != nil {
-		return "", fmt.Errorf("refresh request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("refresh failed: status %d", resp.StatusCode)
-	}
-
-	var result map[string]any
-	if errUnmarshal := json.Unmarshal(body, &result); errUnmarshal != nil {
-		return "", fmt.Errorf("decode refresh response: %w", errUnmarshal)
-	}
-
-	newAccessToken, _ := result["access_token"].(string)
-	if newAccessToken == "" {
-		return "", fmt.Errorf("no access_token in refresh response")
-	}
-
-	tokenMap["access_token"] = newAccessToken
-	return newAccessToken, nil
 }
 
 // jsonEqual compares two JSON blobs by parsing them into Go objects and deep comparing.

@@ -9,20 +9,15 @@ import (
 )
 
 func TestRegisterModelsForAuth_UsesPreMergedExcludedModelsAttribute(t *testing.T) {
-	service := &Service{
-		cfg: &config.Config{
-			OAuthExcludedModels: map[string][]string{
-				"gemini-cli": {"gemini-2.5-pro"},
-			},
-		},
-	}
+	service := &Service{cfg: &config.Config{}}
 	auth := &coreauth.Auth{
-		ID:       "auth-gemini-cli",
-		Provider: "gemini-cli",
+		ID:       "auth-codex",
+		Provider: "codex",
 		Status:   coreauth.StatusActive,
 		Attributes: map[string]string{
 			"auth_kind":       "oauth",
-			"excluded_models": "gemini-2.5-flash",
+			"excluded_models": "gpt-5-codex-mini",
+			"plan_type":       "pro",
 		},
 	}
 
@@ -34,9 +29,9 @@ func TestRegisterModelsForAuth_UsesPreMergedExcludedModelsAttribute(t *testing.T
 
 	service.registerModelsForAuth(auth)
 
-	models := registry.GetAvailableModelsByProvider("gemini-cli")
+	models := registry.GetAvailableModelsByProvider("codex")
 	if len(models) == 0 {
-		t.Fatal("expected gemini-cli models to be registered")
+		t.Fatal("expected codex models to be registered")
 	}
 
 	for _, model := range models {
@@ -44,22 +39,30 @@ func TestRegisterModelsForAuth_UsesPreMergedExcludedModelsAttribute(t *testing.T
 			continue
 		}
 		modelID := strings.TrimSpace(model.ID)
-		if strings.EqualFold(modelID, "gemini-2.5-flash") {
+		if strings.EqualFold(modelID, "gpt-5-codex-mini") {
 			t.Fatalf("expected model %q to be excluded by auth attribute", modelID)
 		}
 	}
 
-	seenGlobalExcluded := false
-	for _, model := range models {
-		if model == nil {
-			continue
-		}
-		if strings.EqualFold(strings.TrimSpace(model.ID), "gemini-2.5-pro") {
-			seenGlobalExcluded = true
-			break
-		}
+}
+
+func TestRegisterModelsForAuth_IgnoresNonCodexProvider(t *testing.T) {
+	service := &Service{cfg: &config.Config{}}
+	auth := &coreauth.Auth{
+		ID:       "auth-gemini",
+		Provider: "gemini",
+		Status:   coreauth.StatusActive,
 	}
-	if !seenGlobalExcluded {
-		t.Fatal("expected global excluded model to be present when attribute override is set")
+
+	registry := GlobalModelRegistry()
+	registry.UnregisterClient(auth.ID)
+	t.Cleanup(func() {
+		registry.UnregisterClient(auth.ID)
+	})
+
+	service.registerModelsForAuth(auth)
+
+	if models := registry.GetAvailableModelsByProvider("gemini"); len(models) != 0 {
+		t.Fatalf("expected no gemini models to be registered, got %d", len(models))
 	}
 }

@@ -7,20 +7,20 @@ import (
 
 func TestGetModelInfoReturnsClone(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "gemini", []*ModelInfo{{
+	r.RegisterClient("client-1", "codex", []*ModelInfo{{
 		ID:          "m1",
 		DisplayName: "Model One",
 		Thinking:    &ThinkingSupport{Min: 1, Max: 2, Levels: []string{"low", "high"}},
 	}})
 
-	first := r.GetModelInfo("m1", "gemini")
+	first := r.GetModelInfo("m1", "codex")
 	if first == nil {
 		t.Fatal("expected model info")
 	}
 	first.DisplayName = "mutated"
 	first.Thinking.Levels[0] = "mutated"
 
-	second := r.GetModelInfo("m1", "gemini")
+	second := r.GetModelInfo("m1", "codex")
 	if second.DisplayName != "Model One" {
 		t.Fatalf("expected cloned display name, got %q", second.DisplayName)
 	}
@@ -31,7 +31,7 @@ func TestGetModelInfoReturnsClone(t *testing.T) {
 
 func TestGetModelsForClientReturnsClones(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "gemini", []*ModelInfo{{
+	r.RegisterClient("client-1", "codex", []*ModelInfo{{
 		ID:          "m1",
 		DisplayName: "Model One",
 		Thinking:    &ThinkingSupport{Levels: []string{"low", "high"}},
@@ -58,20 +58,20 @@ func TestGetModelsForClientReturnsClones(t *testing.T) {
 
 func TestGetAvailableModelsByProviderReturnsClones(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "gemini", []*ModelInfo{{
+	r.RegisterClient("client-1", "codex", []*ModelInfo{{
 		ID:          "m1",
 		DisplayName: "Model One",
 		Thinking:    &ThinkingSupport{Levels: []string{"low", "high"}},
 	}})
 
-	first := r.GetAvailableModelsByProvider("gemini")
+	first := r.GetAvailableModelsByProvider("codex")
 	if len(first) != 1 || first[0] == nil {
 		t.Fatalf("expected one model, got %+v", first)
 	}
 	first[0].DisplayName = "mutated"
 	first[0].Thinking.Levels[0] = "mutated"
 
-	second := r.GetAvailableModelsByProvider("gemini")
+	second := r.GetAvailableModelsByProvider("codex")
 	if len(second) != 1 || second[0] == nil {
 		t.Fatalf("expected one model on second fetch, got %+v", second)
 	}
@@ -136,14 +136,25 @@ func TestGetAvailableModelsReturnsClonedSupportedParameters(t *testing.T) {
 }
 
 func TestLookupModelInfoReturnsCloneForStaticDefinitions(t *testing.T) {
-	first := LookupModelInfo("glm-4.6")
+	first := LookupModelInfo("gpt-5")
 	if first == nil || first.Thinking == nil || len(first.Thinking.Levels) == 0 {
 		t.Fatalf("expected static model with thinking levels, got %+v", first)
 	}
 	first.Thinking.Levels[0] = "mutated"
 
-	second := LookupModelInfo("glm-4.6")
+	second := LookupModelInfo("gpt-5")
 	if second == nil || second.Thinking == nil || len(second.Thinking.Levels) == 0 || second.Thinking.Levels[0] == "mutated" {
 		t.Fatalf("expected static lookup clone, got %+v", second)
+	}
+}
+
+func TestGetStaticModelDefinitionsByChannel_CodexOnly(t *testing.T) {
+	if models := GetStaticModelDefinitionsByChannel("codex"); len(models) == 0 {
+		t.Fatal("expected codex static models")
+	}
+	for _, channel := range []string{"gemini", "claude", "qwen", "iflow", "kimi", "antigravity", "vertex", "aistudio"} {
+		if models := GetStaticModelDefinitionsByChannel(channel); models != nil {
+			t.Fatalf("expected no static models for %q, got %d", channel, len(models))
+		}
 	}
 }

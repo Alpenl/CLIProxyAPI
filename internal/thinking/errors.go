@@ -17,7 +17,7 @@ const (
 	ErrUnknownLevel ErrorCode = "UNKNOWN_LEVEL"
 
 	// ErrThinkingNotSupported indicates the model does not support thinking.
-	// Example: claude-haiku-4-5 does not have thinking capability
+	// Example: a lightweight Codex model may not expose thinking controls
 	ErrThinkingNotSupported ErrorCode = "THINKING_NOT_SUPPORTED"
 
 	// ErrLevelNotSupported indicates the model does not support level mode.
@@ -29,7 +29,7 @@ const (
 	ErrBudgetOutOfRange ErrorCode = "BUDGET_OUT_OF_RANGE"
 
 	// ErrProviderMismatch indicates the provider does not match the model.
-	// Example: applying Claude format to a Gemini model
+	// Example: applying an OpenAI chat payload shape where a Codex responses payload is expected
 	ErrProviderMismatch ErrorCode = "PROVIDER_MISMATCH"
 )
 

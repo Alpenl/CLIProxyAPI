@@ -419,9 +419,8 @@ func convertChatCompletionsStreamChunkToCompletions(chunkData []byte) []byte {
 	return []byte(out)
 }
 
-// handleNonStreamingResponse handles non-streaming chat completion responses
-// for Gemini models. It selects a client from the pool, sends the request, and
-// aggregates the response before sending it back to the client in OpenAI format.
+// handleNonStreamingResponse handles non-streaming chat completion requests for
+// the OpenAI-compatible API surface.
 //
 // Parameters:
 //   - c: The Gin context containing the HTTP request and response
@@ -442,9 +441,8 @@ func (h *OpenAIAPIHandler) handleNonStreamingResponse(c *gin.Context, rawJSON []
 	cliCancel()
 }
 
-// handleStreamingResponse handles streaming responses for Gemini models.
-// It establishes a streaming connection with the backend service and forwards
-// the response chunks to the client in real-time using Server-Sent Events.
+// handleStreamingResponse handles streaming chat completion requests for the
+// OpenAI-compatible API surface.
 //
 // Parameters:
 //   - c: The Gin context containing the HTTP request and response

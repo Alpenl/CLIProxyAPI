@@ -48,9 +48,9 @@ type Auth struct {
 	ID string `json:"id"`
 	// Index is a stable runtime identifier derived from auth metadata (not persisted).
 	Index string `json:"-"`
-	// Provider is the upstream provider key (e.g. "gemini", "claude").
+	// Provider is the upstream provider key. This branch only uses "codex".
 	Provider string `json:"provider"`
-	// Prefix optionally namespaces models for routing (e.g., "teamA/gemini-3-pro-preview").
+	// Prefix optionally namespaces models for routing (e.g., "teamA/gpt-5-codex").
 	Prefix string `json:"prefix,omitempty"`
 	// FileName stores the relative or absolute path of the backing auth file.
 	FileName string `json:"-"`
@@ -347,35 +347,6 @@ func (a *Auth) AccountInfo() (string, string) {
 	if a == nil {
 		return "", ""
 	}
-	// For Gemini CLI, include project ID in the OAuth account info if present.
-	if strings.ToLower(a.Provider) == "gemini-cli" {
-		if a.Metadata != nil {
-			email, _ := a.Metadata["email"].(string)
-			email = strings.TrimSpace(email)
-			if email != "" {
-				if p, ok := a.Metadata["project_id"].(string); ok {
-					p = strings.TrimSpace(p)
-					if p != "" {
-						return "oauth", email + " (" + p + ")"
-					}
-				}
-				return "oauth", email
-			}
-		}
-	}
-
-	// For iFlow provider, prioritize OAuth type if email is present
-	if strings.ToLower(a.Provider) == "iflow" {
-		if a.Metadata != nil {
-			if email, ok := a.Metadata["email"].(string); ok {
-				email = strings.TrimSpace(email)
-				if email != "" {
-					return "oauth", email
-				}
-			}
-		}
-	}
-
 	// Check metadata for email first (OAuth-style auth)
 	if a.Metadata != nil {
 		if v, ok := a.Metadata["email"].(string); ok {
