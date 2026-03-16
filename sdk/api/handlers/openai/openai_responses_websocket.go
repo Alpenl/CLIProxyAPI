@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
@@ -372,41 +372,12 @@ func (h *OpenAIResponsesAPIHandler) websocketUpstreamSupportsIncrementalInputFor
 		return false
 	}
 
-	resolvedModelName := modelName
-	initialSuffix := thinking.ParseSuffix(modelName)
-	if initialSuffix.ModelName == "auto" {
-		resolvedBase := util.ResolveAutoModel(initialSuffix.ModelName)
-		if initialSuffix.HasSuffix {
-			resolvedModelName = fmt.Sprintf("%s(%s)", resolvedBase, initialSuffix.RawSuffix)
-		} else {
-			resolvedModelName = resolvedBase
-		}
-	} else {
-		resolvedModelName = util.ResolveAutoModel(modelName)
-	}
-
-	parsed := thinking.ParseSuffix(resolvedModelName)
-	baseModel := strings.TrimSpace(parsed.ModelName)
-	providers := util.GetProviderName(baseModel)
-	if len(providers) == 0 && baseModel != resolvedModelName {
-		providers = util.GetProviderName(resolvedModelName)
-	}
-	if len(providers) == 0 {
+	resolvedModelName, errMsg := handlers.ResolveCodexRequestModel(modelName)
+	if errMsg != nil {
 		return false
 	}
 
-	providerSet := make(map[string]struct{}, len(providers))
-	for i := 0; i < len(providers); i++ {
-		providerKey := strings.TrimSpace(strings.ToLower(providers[i]))
-		if providerKey == "" {
-			continue
-		}
-		providerSet[providerKey] = struct{}{}
-	}
-	if len(providerSet) == 0 {
-		return false
-	}
-
+	baseModel := strings.TrimSpace(thinking.ParseSuffix(resolvedModelName).ModelName)
 	modelKey := baseModel
 	if modelKey == "" {
 		modelKey = strings.TrimSpace(resolvedModelName)
@@ -419,8 +390,7 @@ func (h *OpenAIResponsesAPIHandler) websocketUpstreamSupportsIncrementalInputFor
 		if auth == nil {
 			continue
 		}
-		providerKey := strings.TrimSpace(strings.ToLower(auth.Provider))
-		if _, ok := providerSet[providerKey]; !ok {
+		if !strings.EqualFold(strings.TrimSpace(auth.Provider), constant.Codex) {
 			continue
 		}
 		if modelKey != "" && registryRef != nil && !registryRef.ClientSupportsModel(auth.ID, modelKey) {

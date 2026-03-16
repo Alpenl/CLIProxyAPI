@@ -1,5 +1,4 @@
-// Package auth provides authentication functionality for various AI service providers.
-// It includes interfaces and implementations for token storage and authentication methods.
+// Package auth defines small authentication interfaces shared by the Codex runtime.
 package auth
 
 // TokenStorage defines the interface for storing authentication tokens.

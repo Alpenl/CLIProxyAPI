@@ -1,6 +1,5 @@
-// Package cliproxy provides the core service implementation for the CLI Proxy API.
-// It includes service lifecycle management, authentication handling, file watching,
-// and integration with various AI service providers through a unified interface.
+// Package cliproxy provides the Codex-only service implementation for the CLI Proxy API.
+// It owns the proxy lifecycle, runtime auth state, file watching, and HTTP server.
 package cliproxy
 
 import (
@@ -10,50 +9,6 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 )
-
-// TokenClientProvider loads clients backed by stored authentication tokens.
-// It provides an interface for loading authentication tokens from various sources
-// and creating clients for AI service providers.
-type TokenClientProvider interface {
-	// Load loads token-based clients from the configured source.
-	//
-	// Parameters:
-	//   - ctx: The context for the loading operation
-	//   - cfg: The application configuration
-	//
-	// Returns:
-	//   - *TokenClientResult: The result containing loaded clients
-	//   - error: An error if loading fails
-	Load(ctx context.Context, cfg *config.Config) (*TokenClientResult, error)
-}
-
-// TokenClientResult represents clients generated from persisted tokens.
-// It contains metadata about the loading operation and the number of successful authentications.
-type TokenClientResult struct {
-	// SuccessfulAuthed is the number of successfully authenticated clients.
-	SuccessfulAuthed int
-}
-
-// APIKeyClientProvider loads clients backed directly by configured API keys.
-// It provides an interface for loading API key-based clients for various AI service providers.
-type APIKeyClientProvider interface {
-	// Load loads API key-based clients from the configuration.
-	//
-	// Parameters:
-	//   - ctx: The context for the loading operation
-	//   - cfg: The application configuration
-	//
-	// Returns:
-	//   - *APIKeyClientResult: The result containing loaded clients
-	//   - error: An error if loading fails
-	Load(ctx context.Context, cfg *config.Config) (*APIKeyClientResult, error)
-}
-
-// APIKeyClientResult is returned by APIKeyClientProvider.Load()
-type APIKeyClientResult struct {
-	// CodexKeyCount is the number of Codex API keys loaded
-	CodexKeyCount int
-}
 
 // WatcherFactory creates a watcher for configuration and token changes.
 // The reload callback receives the updated configuration when changes are detected.
@@ -113,13 +68,7 @@ func (w *WatcherWrapper) DispatchRuntimeAuthUpdate(update watcher.AuthUpdate) bo
 	return w.dispatchRuntimeUpdate(update)
 }
 
-// SetClients updates the watcher file-backed clients registry.
-// SetClients and SetAPIKeyClients removed; watcher manages its own caches
-
-// SnapshotClients returns the current combined clients snapshot from the underlying watcher.
-// SnapshotClients removed; use SnapshotAuths
-
-// SnapshotAuths returns the current auth entries derived from legacy clients.
+// SnapshotAuths returns the current auth entries derived from watched files.
 func (w *WatcherWrapper) SnapshotAuths() []*coreauth.Auth {
 	if w == nil || w.snapshotAuths == nil {
 		return nil

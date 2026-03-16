@@ -1,6 +1,4 @@
-// Package util provides utility functions used across the CLIProxyAPI application.
-// These functions handle common tasks such as determining AI service providers
-// from model names and managing HTTP proxies.
+// Package util provides shared helpers for model selection, logging, and proxy handling.
 package util
 
 import (
@@ -10,46 +8,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	log "github.com/sirupsen/logrus"
 )
-
-// GetProviderName determines all AI service providers capable of serving a registered model.
-// It first queries the global model registry to retrieve the providers backing the supplied model name.
-// When the model has not been registered yet, it falls back to legacy string heuristics to infer
-// potential providers.
-//
-// Parameters:
-//   - modelName: The name of the model to identify providers for.
-//
-// Returns:
-//   - []string: All provider identifiers capable of serving the model, ordered by preference.
-func GetProviderName(modelName string) []string {
-	if modelName == "" {
-		return nil
-	}
-
-	providers := make([]string, 0, 4)
-	seen := make(map[string]struct{})
-
-	appendProvider := func(name string) {
-		if name == "" {
-			return
-		}
-		if _, exists := seen[name]; exists {
-			return
-		}
-		seen[name] = struct{}{}
-		providers = append(providers, name)
-	}
-
-	for _, provider := range registry.GetGlobalRegistry().GetModelProviders(modelName) {
-		appendProvider(provider)
-	}
-
-	if len(providers) > 0 {
-		return providers
-	}
-
-	return providers
-}
 
 // ResolveAutoModel resolves the "auto" model name to an actual available model.
 // It uses an empty handler type to get any available model from the registry.

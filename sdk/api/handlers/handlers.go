@@ -14,8 +14,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/thinking"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
@@ -468,7 +470,7 @@ func appendAPIResponse(c *gin.Context, data []byte) {
 // ExecuteWithAuthManager executes a non-streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, http.Header, *interfaces.ErrorMessage) {
-	providers, normalizedModel, errMsg := h.getRequestDetails(modelName)
+	provider, normalizedModel, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		return nil, nil, errMsg
 	}
@@ -488,7 +490,7 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 		SourceFormat:    sdktranslator.FromString(handlerType),
 	}
 	opts.Metadata = reqMeta
-	resp, err := h.AuthManager.Execute(ctx, providers, req, opts)
+	resp, err := h.AuthManager.Execute(ctx, provider, req, opts)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if se, ok := err.(interface{ StatusCode() int }); ok && se != nil {
@@ -513,7 +515,7 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 // ExecuteCountWithAuthManager executes a non-streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, http.Header, *interfaces.ErrorMessage) {
-	providers, normalizedModel, errMsg := h.getRequestDetails(modelName)
+	provider, normalizedModel, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		return nil, nil, errMsg
 	}
@@ -533,7 +535,7 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 		SourceFormat:    sdktranslator.FromString(handlerType),
 	}
 	opts.Metadata = reqMeta
-	resp, err := h.AuthManager.ExecuteCount(ctx, providers, req, opts)
+	resp, err := h.AuthManager.ExecuteCount(ctx, provider, req, opts)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if se, ok := err.(interface{ StatusCode() int }); ok && se != nil {
@@ -559,7 +561,7 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 // This path is the only supported execution route.
 // The returned http.Header carries upstream response headers captured before streaming begins.
 func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
-	providers, normalizedModel, errMsg := h.getRequestDetails(modelName)
+	provider, normalizedModel, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
 		errChan <- errMsg
@@ -582,7 +584,7 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 		SourceFormat:    sdktranslator.FromString(handlerType),
 	}
 	opts.Metadata = reqMeta
-	streamResult, err := h.AuthManager.ExecuteStream(ctx, providers, req, opts)
+	streamResult, err := h.AuthManager.ExecuteStream(ctx, provider, req, opts)
 	if err != nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
 		status := http.StatusInternalServerError
@@ -685,7 +687,7 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 					if !sentPayload {
 						if bootstrapRetries < maxBootstrapRetries && bootstrapEligible(streamErr) {
 							bootstrapRetries++
-							retryResult, retryErr := h.AuthManager.ExecuteStream(ctx, providers, req, opts)
+							retryResult, retryErr := h.AuthManager.ExecuteStream(ctx, provider, req, opts)
 							if retryErr == nil {
 								if passthroughHeadersEnabled {
 									replaceHeader(upstreamHeaders, FilterUpstreamHeaders(retryResult.Headers))
@@ -771,7 +773,7 @@ func statusFromError(err error) int {
 	return 0
 }
 
-func (h *BaseAPIHandler) getRequestDetails(modelName string) (providers []string, normalizedModel string, err *interfaces.ErrorMessage) {
+func ResolveCodexRequestModel(modelName string) (normalizedModel string, err *interfaces.ErrorMessage) {
 	resolvedModelName := modelName
 	initialSuffix := thinking.ParseSuffix(modelName)
 	if initialSuffix.ModelName == "auto" {
@@ -788,23 +790,40 @@ func (h *BaseAPIHandler) getRequestDetails(modelName string) (providers []string
 	parsed := thinking.ParseSuffix(resolvedModelName)
 	baseModel := strings.TrimSpace(parsed.ModelName)
 
-	providers = util.GetProviderName(baseModel)
-	// Fallback: if baseModel has no provider but differs from resolvedModelName,
-	// try using the full model name. This handles edge cases where custom models
-	// may be registered with their full suffixed name (e.g., "my-model(8192)").
-	// Evaluated in Story 11.8: This fallback is intentionally preserved to support
-	// custom model registrations that include thinking suffixes.
-	if len(providers) == 0 && baseModel != resolvedModelName {
-		providers = util.GetProviderName(resolvedModelName)
+	hasCodexProvider := modelHasProvider(baseModel, constant.Codex)
+	if !hasCodexProvider && baseModel != resolvedModelName {
+		hasCodexProvider = modelHasProvider(resolvedModelName, constant.Codex)
 	}
 
-	if len(providers) == 0 {
-		return nil, "", &interfaces.ErrorMessage{StatusCode: http.StatusBadGateway, Error: fmt.Errorf("unknown provider for model %s", modelName)}
+	if !hasCodexProvider {
+		return "", &interfaces.ErrorMessage{StatusCode: http.StatusBadGateway, Error: fmt.Errorf("unknown provider for model %s", modelName)}
 	}
 
 	// The thinking suffix is preserved in the model name itself, so no
 	// metadata-based configuration passing is needed.
-	return providers, resolvedModelName, nil
+	return resolvedModelName, nil
+}
+
+func modelHasProvider(modelName, provider string) bool {
+	modelName = strings.TrimSpace(modelName)
+	provider = strings.TrimSpace(provider)
+	if modelName == "" || provider == "" {
+		return false
+	}
+	for _, candidate := range registry.GetGlobalRegistry().GetModelProviders(modelName) {
+		if strings.EqualFold(strings.TrimSpace(candidate), provider) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *BaseAPIHandler) getRequestDetails(modelName string) (provider string, normalizedModel string, err *interfaces.ErrorMessage) {
+	normalizedModel, err = ResolveCodexRequestModel(modelName)
+	if err != nil {
+		return "", "", err
+	}
+	return constant.Codex, normalizedModel, nil
 }
 
 func cloneBytes(src []byte) []byte {

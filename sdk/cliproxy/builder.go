@@ -1,6 +1,5 @@
-// Package cliproxy provides the core service implementation for the CLI Proxy API.
-// It includes service lifecycle management, authentication handling, file watching,
-// and integration with various AI service providers through a unified interface.
+// Package cliproxy provides the Codex-only service implementation for the CLI Proxy API.
+// It owns the proxy lifecycle, runtime auth state, file watching, and HTTP server.
 package cliproxy
 
 import (
@@ -15,9 +14,9 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 )
 
-// Builder constructs a Service instance with customizable providers.
-// It provides a fluent interface for configuring all aspects of the service
-// including authentication, file watching, HTTP server options, and lifecycle hooks.
+// Builder constructs a Service instance with configurable lifecycle dependencies.
+// It provides a fluent interface for configuring authentication, file watching,
+// HTTP server options, and lifecycle hooks.
 type Builder struct {
 	// cfg holds the application configuration.
 	cfg *config.Config
@@ -25,19 +24,13 @@ type Builder struct {
 	// configPath is the path to the configuration file.
 	configPath string
 
-	// tokenProvider handles loading token-based clients.
-	tokenProvider TokenClientProvider
-
-	// apiKeyProvider handles loading API key-based clients.
-	apiKeyProvider APIKeyClientProvider
-
 	// watcherFactory creates file watcher instances.
 	watcherFactory WatcherFactory
 
 	// hooks provides lifecycle callbacks.
 	hooks Hooks
 
-	// authManager handles legacy authentication operations.
+	// authManager handles token lifecycle operations.
 	authManager *sdkAuth.Manager
 
 	// accessManager handles request authentication providers.
@@ -93,18 +86,6 @@ func (b *Builder) WithConfig(cfg *config.Config) *Builder {
 //   - *Builder: The builder instance for method chaining
 func (b *Builder) WithConfigPath(path string) *Builder {
 	b.configPath = path
-	return b
-}
-
-// WithTokenClientProvider overrides the provider responsible for token-backed clients.
-func (b *Builder) WithTokenClientProvider(provider TokenClientProvider) *Builder {
-	b.tokenProvider = provider
-	return b
-}
-
-// WithAPIKeyClientProvider overrides the provider responsible for API key-backed clients.
-func (b *Builder) WithAPIKeyClientProvider(provider APIKeyClientProvider) *Builder {
-	b.apiKeyProvider = provider
 	return b
 }
 
@@ -172,16 +153,6 @@ func (b *Builder) Build() (*Service, error) {
 		return nil, fmt.Errorf("cliproxy: configuration path is required")
 	}
 
-	tokenProvider := b.tokenProvider
-	if tokenProvider == nil {
-		tokenProvider = NewFileTokenClientProvider()
-	}
-
-	apiKeyProvider := b.apiKeyProvider
-	if apiKeyProvider == nil {
-		apiKeyProvider = NewAPIKeyClientProvider()
-	}
-
 	watcherFactory := b.watcherFactory
 	if watcherFactory == nil {
 		watcherFactory = defaultWatcherFactory
@@ -228,8 +199,6 @@ func (b *Builder) Build() (*Service, error) {
 	service := &Service{
 		cfg:            b.cfg,
 		configPath:     b.configPath,
-		tokenProvider:  tokenProvider,
-		apiKeyProvider: apiKeyProvider,
 		watcherFactory: watcherFactory,
 		hooks:          b.hooks,
 		authManager:    authManager,

@@ -1,11 +1,9 @@
-// Package cliproxy provides the core service implementation for the CLI Proxy API.
-// It includes service lifecycle management, authentication handling, file watching,
-// and integration with various AI service providers through a unified interface.
+// Package cliproxy provides the Codex-only service implementation for the CLI Proxy API.
+// It owns the proxy lifecycle, runtime auth state, file watching, and HTTP server.
 package cliproxy
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -26,8 +24,7 @@ import (
 )
 
 // Service wraps the proxy server lifecycle so external programs can embed the CLI proxy.
-// It manages the complete lifecycle including authentication, file watching, HTTP server,
-// and integration with various AI service providers.
+// It manages authentication, file watching, model registration, and the HTTP server.
 type Service struct {
 	// cfg holds the current application configuration.
 	cfg *config.Config
@@ -37,12 +34,6 @@ type Service struct {
 
 	// configPath is the path to the configuration file.
 	configPath string
-
-	// tokenProvider handles loading token-based clients.
-	tokenProvider TokenClientProvider
-
-	// apiKeyProvider handles loading API key-based clients.
-	apiKeyProvider APIKeyClientProvider
 
 	// watcherFactory creates file watcher instances.
 	watcherFactory WatcherFactory
@@ -71,7 +62,7 @@ type Service struct {
 	// authQueueStop cancels the auth update queue processing.
 	authQueueStop context.CancelFunc
 
-	// authManager handles legacy authentication operations.
+	// authManager handles token lifecycle operations.
 	authManager *sdkAuth.Manager
 
 	// accessManager handles request authentication providers.
@@ -358,25 +349,6 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}
 
-	tokenResult, err := s.tokenProvider.Load(ctx, s.cfg)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		return err
-	}
-	if tokenResult == nil {
-		tokenResult = &TokenClientResult{}
-	}
-
-	apiKeyResult, err := s.apiKeyProvider.Load(ctx, s.cfg)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		return err
-	}
-	if apiKeyResult == nil {
-		apiKeyResult = &APIKeyClientResult{}
-	}
-
-	// legacy clients removed; no caches to refresh
-
-	// handlers no longer depend on legacy clients; pass nil slice initially
 	s.server = api.NewServer(s.cfg, s.coreManager, s.accessManager, s.configPath, s.serverOptions...)
 
 	if s.authManager == nil {
@@ -494,7 +466,7 @@ func (s *Service) Run(ctx context.Context) error {
 		s.rebindExecutors()
 	}
 
-	watcherWrapper, err = s.watcherFactory(s.configPath, s.cfg.AuthDir, reloadCallback)
+	watcherWrapper, err := s.watcherFactory(s.configPath, s.cfg.AuthDir, reloadCallback)
 	if err != nil {
 		return fmt.Errorf("cliproxy: failed to create watcher: %w", err)
 	}
@@ -507,7 +479,7 @@ func (s *Service) Run(ctx context.Context) error {
 
 	watcherCtx, watcherCancel := context.WithCancel(context.Background())
 	s.watcherCancel = watcherCancel
-	if err = watcherWrapper.Start(watcherCtx); err != nil {
+	if err := watcherWrapper.Start(watcherCtx); err != nil {
 		return fmt.Errorf("cliproxy: failed to start watcher: %w", err)
 	}
 	log.Info("file watcher started for config and auth directory changes")
@@ -523,7 +495,7 @@ func (s *Service) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Debug("service context cancelled, shutting down...")
 		return ctx.Err()
-	case err = <-s.serverErr:
+	case err := <-s.serverErr:
 		return err
 	}
 }

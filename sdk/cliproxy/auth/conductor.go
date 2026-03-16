@@ -757,12 +757,11 @@ func (m *Manager) Load(ctx context.Context) error {
 }
 
 // Execute performs a non-streaming execution using the configured selector and executor.
-func (m *Manager) Execute(ctx context.Context, providers []string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
-	normalized := m.normalizeProviders(providers)
-	if len(normalized) == 0 {
+func (m *Manager) Execute(ctx context.Context, provider string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
 		return cliproxyexecutor.Response{}, &Error{Code: "provider_not_found", Message: "no provider supplied"}
 	}
-	provider := normalized[0]
 
 	_, maxRetryCredentials, maxWait := m.retrySettings()
 
@@ -773,7 +772,7 @@ func (m *Manager) Execute(ctx context.Context, providers []string, req cliproxye
 			return resp, nil
 		}
 		lastErr = errExec
-		wait, shouldRetry := m.shouldRetryAfterError(errExec, attempt, []string{provider}, req.Model, maxWait)
+		wait, shouldRetry := m.shouldRetryAfterError(errExec, attempt, provider, req.Model, maxWait)
 		if !shouldRetry {
 			break
 		}
@@ -788,12 +787,11 @@ func (m *Manager) Execute(ctx context.Context, providers []string, req cliproxye
 }
 
 // ExecuteCount performs a non-streaming execution using the configured selector and executor.
-func (m *Manager) ExecuteCount(ctx context.Context, providers []string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
-	normalized := m.normalizeProviders(providers)
-	if len(normalized) == 0 {
+func (m *Manager) ExecuteCount(ctx context.Context, provider string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
 		return cliproxyexecutor.Response{}, &Error{Code: "provider_not_found", Message: "no provider supplied"}
 	}
-	provider := normalized[0]
 
 	_, maxRetryCredentials, maxWait := m.retrySettings()
 
@@ -804,7 +802,7 @@ func (m *Manager) ExecuteCount(ctx context.Context, providers []string, req clip
 			return resp, nil
 		}
 		lastErr = errExec
-		wait, shouldRetry := m.shouldRetryAfterError(errExec, attempt, []string{provider}, req.Model, maxWait)
+		wait, shouldRetry := m.shouldRetryAfterError(errExec, attempt, provider, req.Model, maxWait)
 		if !shouldRetry {
 			break
 		}
@@ -819,12 +817,11 @@ func (m *Manager) ExecuteCount(ctx context.Context, providers []string, req clip
 }
 
 // ExecuteStream performs a streaming execution using the configured selector and executor.
-func (m *Manager) ExecuteStream(ctx context.Context, providers []string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
-	normalized := m.normalizeProviders(providers)
-	if len(normalized) == 0 {
+func (m *Manager) ExecuteStream(ctx context.Context, provider string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
 		return nil, &Error{Code: "provider_not_found", Message: "no provider supplied"}
 	}
-	provider := normalized[0]
 
 	_, maxRetryCredentials, maxWait := m.retrySettings()
 
@@ -835,7 +832,7 @@ func (m *Manager) ExecuteStream(ctx context.Context, providers []string, req cli
 			return result, nil
 		}
 		lastErr = errStream
-		wait, shouldRetry := m.shouldRetryAfterError(errStream, attempt, []string{provider}, req.Model, maxWait)
+		wait, shouldRetry := m.shouldRetryAfterError(errStream, attempt, provider, req.Model, maxWait)
 		if !shouldRetry {
 			break
 		}
@@ -1196,26 +1193,6 @@ func asModelAliasEntries[T interface {
 	return out
 }
 
-func (m *Manager) normalizeProviders(providers []string) []string {
-	if len(providers) == 0 {
-		return nil
-	}
-	result := make([]string, 0, len(providers))
-	seen := make(map[string]struct{}, len(providers))
-	for _, provider := range providers {
-		p := strings.TrimSpace(strings.ToLower(provider))
-		if p == "" {
-			continue
-		}
-		if _, ok := seen[p]; ok {
-			continue
-		}
-		seen[p] = struct{}{}
-		result = append(result, p)
-	}
-	return result
-}
-
 func (m *Manager) retrySettings() (int, int, time.Duration) {
 	if m == nil {
 		return 0, 0, 0
@@ -1223,22 +1200,18 @@ func (m *Manager) retrySettings() (int, int, time.Duration) {
 	return int(m.requestRetry.Load()), int(m.maxRetryCredentials.Load()), time.Duration(m.maxRetryInterval.Load())
 }
 
-func (m *Manager) closestCooldownWait(providers []string, model string, attempt int) (time.Duration, bool) {
-	if m == nil || len(providers) == 0 {
+func (m *Manager) closestCooldownWait(provider string, model string, attempt int) (time.Duration, bool) {
+	if m == nil {
+		return 0, false
+	}
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
 		return 0, false
 	}
 	now := time.Now()
 	defaultRetry := int(m.requestRetry.Load())
 	if defaultRetry < 0 {
 		defaultRetry = 0
-	}
-	providerSet := make(map[string]struct{}, len(providers))
-	for i := range providers {
-		key := strings.TrimSpace(strings.ToLower(providers[i]))
-		if key == "" {
-			continue
-		}
-		providerSet[key] = struct{}{}
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -1251,7 +1224,7 @@ func (m *Manager) closestCooldownWait(providers []string, model string, attempt 
 			continue
 		}
 		providerKey := strings.TrimSpace(strings.ToLower(auth.Provider))
-		if _, ok := providerSet[providerKey]; !ok {
+		if providerKey != provider {
 			continue
 		}
 		effectiveRetry := defaultRetry
@@ -1280,7 +1253,7 @@ func (m *Manager) closestCooldownWait(providers []string, model string, attempt 
 	return minWait, found
 }
 
-func (m *Manager) shouldRetryAfterError(err error, attempt int, providers []string, model string, maxWait time.Duration) (time.Duration, bool) {
+func (m *Manager) shouldRetryAfterError(err error, attempt int, provider string, model string, maxWait time.Duration) (time.Duration, bool) {
 	if err == nil {
 		return 0, false
 	}
@@ -1293,7 +1266,7 @@ func (m *Manager) shouldRetryAfterError(err error, attempt int, providers []stri
 	if isRequestInvalidError(err) {
 		return 0, false
 	}
-	wait, found := m.closestCooldownWait(providers, model, attempt)
+	wait, found := m.closestCooldownWait(provider, model, attempt)
 	if !found || wait > maxWait {
 		return 0, false
 	}

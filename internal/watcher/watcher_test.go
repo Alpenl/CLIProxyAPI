@@ -12,17 +12,6 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 )
 
-func TestBuildAPIKeyClientsCounts_CodexOnly(t *testing.T) {
-	cfg := &config.Config{
-		CodexKey: []config.CodexKey{{APIKey: "x1"}, {APIKey: "x2"}},
-	}
-
-	codex := BuildAPIKeyClients(cfg)
-	if codex != 2 {
-		t.Fatalf("unexpected codex count: %d", codex)
-	}
-}
-
 func TestNormalizeAuthStripsTemporalFields(t *testing.T) {
 	now := time.Now()
 	auth := &coreauth.Auth{

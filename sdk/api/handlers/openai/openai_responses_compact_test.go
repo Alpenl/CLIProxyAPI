@@ -22,7 +22,7 @@ type compactCaptureExecutor struct {
 	calls        int
 }
 
-func (e *compactCaptureExecutor) Identifier() string { return "test-provider" }
+func (e *compactCaptureExecutor) Identifier() string { return "codex" }
 
 func (e *compactCaptureExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	e.calls++

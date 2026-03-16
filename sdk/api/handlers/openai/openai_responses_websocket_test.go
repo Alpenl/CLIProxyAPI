@@ -26,7 +26,7 @@ type websocketCaptureExecutor struct {
 	payloads    [][]byte
 }
 
-func (e *websocketCaptureExecutor) Identifier() string { return "test-provider" }
+func (e *websocketCaptureExecutor) Identifier() string { return "codex" }
 
 func (e *websocketCaptureExecutor) Execute(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error) {
 	return coreexecutor.Response{}, errors.New("not implemented")
@@ -397,7 +397,7 @@ func TestWebsocketUpstreamSupportsIncrementalInputForModel(t *testing.T) {
 	manager := coreauth.NewManager(nil, nil, nil)
 	auth := &coreauth.Auth{
 		ID:         "auth-ws",
-		Provider:   "test-provider",
+		Provider:   "codex",
 		Status:     coreauth.StatusActive,
 		Attributes: map[string]string{"websockets": "true"},
 	}

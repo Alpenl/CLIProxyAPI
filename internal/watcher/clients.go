@@ -34,7 +34,7 @@ func (w *Watcher) reloadClients(rescanAuth bool, forceAuthRefresh bool) {
 		return
 	}
 
-	codexAPIKeyCount := BuildAPIKeyClients(cfg)
+	codexAPIKeyCount := len(cfg.CodexKey)
 	totalAPIKeyClients := codexAPIKeyCount
 	log.Debugf("loaded %d API key clients", totalAPIKeyClients)
 
@@ -280,18 +280,6 @@ func (w *Watcher) loadFileClients(cfg *config.Config) int {
 	}
 	log.Debugf("auth directory scan complete - found %d .json files, %d readable", authFileCount, successfulAuthCount)
 	return authFileCount
-}
-
-func BuildAPIKeyClients(cfg *config.Config) int {
-	if cfg == nil {
-		return 0
-	}
-	codexAPIKeyCount := 0
-
-	if len(cfg.CodexKey) > 0 {
-		codexAPIKeyCount += len(cfg.CodexKey)
-	}
-	return codexAPIKeyCount
 }
 
 func (w *Watcher) persistConfigAsync() {

@@ -416,11 +416,6 @@ func SaveConfigPreserveComments(configFile string, cfg *Config) error {
 		return fmt.Errorf("expected generated root mapping node")
 	}
 
-	// Remove deprecated sections before merging back the sanitized config.
-	removeLegacyAuthBlock(original.Content[0])
-	removeLegacyProviderConfig(original.Content[0])
-	removeLegacyGenerativeLanguageKeys(original.Content[0])
-
 	// Merge generated into original in-place, preserving comments/order of existing nodes.
 	mergeMappingPreserve(original.Content[0], generated.Content[0])
 	normalizeCollectionNodeStyles(original.Content[0])
@@ -1078,33 +1073,4 @@ func normalizeCollectionNodeStyles(node *yaml.Node) {
 	default:
 		// Scalars keep their existing style to preserve quoting
 	}
-}
-
-func removeLegacyProviderConfig(root *yaml.Node) {
-	if root == nil || root.Kind != yaml.MappingNode {
-		return
-	}
-	removeMapKey(root, "gemini-api-key")
-	removeMapKey(root, "claude-api-key")
-	removeMapKey(root, "openai-compatibility")
-	removeMapKey(root, "vertex-api-key")
-	removeMapKey(root, "ampcode")
-	removeMapKey(root, "amp-upstream-url")
-	removeMapKey(root, "amp-upstream-api-key")
-	removeMapKey(root, "amp-restrict-management-to-localhost")
-	removeMapKey(root, "amp-model-mappings")
-}
-
-func removeLegacyGenerativeLanguageKeys(root *yaml.Node) {
-	if root == nil || root.Kind != yaml.MappingNode {
-		return
-	}
-	removeMapKey(root, "generative-language-api-key")
-}
-
-func removeLegacyAuthBlock(root *yaml.Node) {
-	if root == nil || root.Kind != yaml.MappingNode {
-		return
-	}
-	removeMapKey(root, "auth")
 }
