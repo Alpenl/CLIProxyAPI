@@ -37,8 +37,8 @@ var modelsCatalogStore = &modelStore{}
 var updaterOnce sync.Once
 
 // ModelRefreshCallback is invoked when startup or periodic model refresh detects changes.
-// changedProviders contains the provider names whose model definitions changed.
-type ModelRefreshCallback func(changedProviders []string)
+// changedCatalogKeys contains the catalog keys whose model definitions changed.
+type ModelRefreshCallback func(changedCatalogKeys []string)
 
 var (
 	refreshCallbackMu     sync.Mutex
@@ -100,7 +100,7 @@ func periodicRefresh(ctx context.Context) {
 }
 
 // tryPeriodicRefresh fetches models from remote, compares with the current
-// catalog, and notifies the registered callback if any provider changed.
+// catalog, and notifies the registered callback if any catalog key changed.
 func tryPeriodicRefresh(ctx context.Context) {
 	tryRefreshModels(ctx, "periodic model refresh")
 }
@@ -122,7 +122,7 @@ func tryRefreshModels(ctx context.Context, label string) {
 	}
 
 	// Detect changes before updating store.
-	changed := detectChangedProviders(oldData, parsed)
+	changed := detectChangedCatalogKeys(oldData, parsed)
 
 	// Update store with new data regardless.
 	modelsCatalogStore.mu.Lock()
@@ -134,7 +134,7 @@ func tryRefreshModels(ctx context.Context, label string) {
 		return
 	}
 
-	log.Infof("%s completed from %s, changes detected for providers: %v", label, url, changed)
+	log.Infof("%s completed from %s, changes detected for catalog keys: %v", label, url, changed)
 	notifyModelRefresh(changed)
 }
 
@@ -189,16 +189,16 @@ func fetchModelsFromRemote(ctx context.Context) (*staticModelsJSON, string) {
 	return nil, ""
 }
 
-// detectChangedProviders compares two model catalogs and returns provider names
+// detectChangedCatalogKeys compares two model catalogs and returns catalog keys
 // whose model definitions differ. Codex tiers (free/team/plus/pro) are grouped
-// under a single "codex" provider.
-func detectChangedProviders(oldData, newData *staticModelsJSON) []string {
+// under a single "codex" key.
+func detectChangedCatalogKeys(oldData, newData *staticModelsJSON) []string {
 	if oldData == nil || newData == nil {
 		return nil
 	}
 
 	type section struct {
-		provider string
+		key     string
 		oldList  []*ModelInfo
 		newList  []*ModelInfo
 	}
@@ -213,12 +213,12 @@ func detectChangedProviders(oldData, newData *staticModelsJSON) []string {
 	seen := make(map[string]bool, len(sections))
 	var changed []string
 	for _, s := range sections {
-		if seen[s.provider] {
+		if seen[s.key] {
 			continue
 		}
 		if modelSectionChanged(s.oldList, s.newList) {
-			changed = append(changed, s.provider)
-			seen[s.provider] = true
+			changed = append(changed, s.key)
+			seen[s.key] = true
 		}
 	}
 	return changed
@@ -240,30 +240,30 @@ func modelSectionChanged(a, b []*ModelInfo) bool {
 	return string(aj) != string(bj)
 }
 
-func notifyModelRefresh(changedProviders []string) {
-	if len(changedProviders) == 0 {
+func notifyModelRefresh(changedCatalogKeys []string) {
+	if len(changedCatalogKeys) == 0 {
 		return
 	}
 
 	refreshCallbackMu.Lock()
 	cb := refreshCallback
 	if cb == nil {
-		pendingRefreshChanges = mergeProviderNames(pendingRefreshChanges, changedProviders)
+		pendingRefreshChanges = mergeCatalogKeys(pendingRefreshChanges, changedCatalogKeys)
 		refreshCallbackMu.Unlock()
 		return
 	}
 	refreshCallbackMu.Unlock()
-	cb(changedProviders)
+	cb(changedCatalogKeys)
 }
 
-func mergeProviderNames(existing, incoming []string) []string {
+func mergeCatalogKeys(existing, incoming []string) []string {
 	if len(incoming) == 0 {
 		return existing
 	}
 	seen := make(map[string]struct{}, len(existing)+len(incoming))
 	merged := make([]string, 0, len(existing)+len(incoming))
-	for _, provider := range existing {
-		name := strings.ToLower(strings.TrimSpace(provider))
+	for _, key := range existing {
+		name := strings.ToLower(strings.TrimSpace(key))
 		if name == "" {
 			continue
 		}
@@ -273,8 +273,8 @@ func mergeProviderNames(existing, incoming []string) []string {
 		seen[name] = struct{}{}
 		merged = append(merged, name)
 	}
-	for _, provider := range incoming {
-		name := strings.ToLower(strings.TrimSpace(provider))
+	for _, key := range incoming {
+		name := strings.ToLower(strings.TrimSpace(key))
 		if name == "" {
 			continue
 		}

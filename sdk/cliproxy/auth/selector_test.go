@@ -214,7 +214,7 @@ func TestSelectorPick_AllCooldownReturnsModelCooldownError(t *testing.T) {
 		},
 	}
 
-	t.Run("error payload omits provider field", func(t *testing.T) {
+	t.Run("error payload omits legacy provider field", func(t *testing.T) {
 		t.Parallel()
 
 		selector := &FillFirstSelector{}

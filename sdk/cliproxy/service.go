@@ -61,7 +61,7 @@ type Service struct {
 	// authQueueStop cancels the auth update queue processing.
 	authQueueStop context.CancelFunc
 
-	// accessManager handles request authentication providers.
+	// accessManager handles request access checks.
 	accessManager *sdkaccess.Manager
 
 	// coreManager handles core authentication and execution.
@@ -348,13 +348,13 @@ func (s *Service) Run(ctx context.Context) error {
 	// model snapshot instead of preserving previous suppression state.
 	// This intentionally rebuilds per-auth model availability from the latest catalog
 	// snapshot instead of preserving prior registry suppression state.
-	registry.SetModelRefreshCallback(func(changedProviders []string) {
-		if s == nil || s.coreManager == nil || len(changedProviders) == 0 {
+	registry.SetModelRefreshCallback(func(changedCatalogKeys []string) {
+		if s == nil || s.coreManager == nil || len(changedCatalogKeys) == 0 {
 			return
 		}
 		changed := false
-		for _, provider := range changedProviders {
-			if strings.EqualFold(strings.TrimSpace(provider), "codex") {
+		for _, changedKey := range changedCatalogKeys {
+			if strings.EqualFold(strings.TrimSpace(changedKey), "codex") {
 				changed = true
 				break
 			}

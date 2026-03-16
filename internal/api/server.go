@@ -126,7 +126,7 @@ type Server struct {
 	// This prevents issues when the config object is modified in place by Management API.
 	oldConfigYaml []byte
 
-	// accessManager handles request authentication providers.
+	// accessManager handles request access checks.
 	accessManager *sdkaccess.Manager
 
 	// requestLogger is the request logger instance for dynamic configuration updates.
@@ -639,7 +639,7 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 // (management handlers moved to internal/api/handlers/management)
 
 // AuthMiddleware returns a Gin middleware handler that authenticates requests
-// using the configured authentication providers. When no providers are available,
+// using the configured access checks. When none are available,
 // it allows all requests (legacy behaviour).
 func AuthMiddleware(manager *sdkaccess.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {

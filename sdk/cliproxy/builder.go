@@ -30,7 +30,7 @@ type Builder struct {
 	// hooks provides lifecycle callbacks.
 	hooks Hooks
 
-	// accessManager handles request authentication providers.
+	// accessManager handles request access checks.
 	accessManager *sdkaccess.Manager
 
 	// coreManager handles core authentication and execution.
@@ -178,7 +178,7 @@ func (b *Builder) Build() (*Service, error) {
 
 		coreManager = coreauth.NewManager(tokenStore, selector, nil)
 	}
-	// Attach a default RoundTripper provider so providers can opt-in per-auth transports.
+	// Attach a default RoundTripper source so backends can opt-in per-auth transports.
 	coreManager.SetRoundTripperProvider(newDefaultRoundTripperProvider())
 	coreManager.SetConfig(b.cfg)
 

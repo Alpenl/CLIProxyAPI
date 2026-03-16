@@ -16,7 +16,7 @@ import (
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 )
 
-// RoundRobinSelector provides a simple provider scoped round-robin selection strategy.
+// RoundRobinSelector provides a simple model-scoped round-robin selection strategy.
 type RoundRobinSelector struct {
 	mu      sync.Mutex
 	cursors map[string]int

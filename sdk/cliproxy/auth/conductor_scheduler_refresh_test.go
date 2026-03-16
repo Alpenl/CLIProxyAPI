@@ -10,29 +10,29 @@ import (
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 )
 
-type schedulerProviderTestExecutor struct {
-	provider string
+type schedulerRefreshTestExecutor struct {
+	backendID string
 }
 
-func (e schedulerProviderTestExecutor) Identifier() string { return e.provider }
+func (e schedulerRefreshTestExecutor) Identifier() string { return e.backendID }
 
-func (e schedulerProviderTestExecutor) Execute(ctx context.Context, auth *Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e schedulerRefreshTestExecutor) Execute(ctx context.Context, auth *Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
 	return cliproxyexecutor.Response{}, nil
 }
 
-func (e schedulerProviderTestExecutor) ExecuteStream(ctx context.Context, auth *Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+func (e schedulerRefreshTestExecutor) ExecuteStream(ctx context.Context, auth *Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
 	return nil, nil
 }
 
-func (e schedulerProviderTestExecutor) Refresh(ctx context.Context, auth *Auth) (*Auth, error) {
+func (e schedulerRefreshTestExecutor) Refresh(ctx context.Context, auth *Auth) (*Auth, error) {
 	return auth, nil
 }
 
-func (e schedulerProviderTestExecutor) CountTokens(ctx context.Context, auth *Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e schedulerRefreshTestExecutor) CountTokens(ctx context.Context, auth *Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
 	return cliproxyexecutor.Response{}, nil
 }
 
-func (e schedulerProviderTestExecutor) HttpRequest(ctx context.Context, auth *Auth, req *http.Request) (*http.Response, error) {
+func (e schedulerRefreshTestExecutor) HttpRequest(ctx context.Context, auth *Auth, req *http.Request) (*http.Response, error) {
 	return nil, nil
 }
 
@@ -107,7 +107,7 @@ func TestManager_RefreshSchedulerEntry_RebuildsSupportedModelSetAfterModelRegist
 func TestManager_PickNext_RebuildsSchedulerAfterModelCooldownError(t *testing.T) {
 	ctx := context.Background()
 	manager := NewManager(nil, &RoundRobinSelector{}, nil)
-	manager.RegisterExecutor(schedulerProviderTestExecutor{provider: "codex"})
+	manager.RegisterExecutor(schedulerRefreshTestExecutor{backendID: "codex"})
 
 	registerSchedulerModels(t, "scheduler-cooldown-rebuild-model", "cooldown-stale-old")
 

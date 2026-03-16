@@ -39,13 +39,13 @@ func (e schedulerBenchmarkExecutor) HttpRequest(ctx context.Context, auth *Auth,
 func benchmarkManagerSetup(b *testing.B, total int, withPriority bool) (*Manager, string) {
 	b.Helper()
 	manager := NewManager(nil, &RoundRobinSelector{}, nil)
-	const provider = "codex"
-	manager.executor = schedulerBenchmarkExecutor{id: provider}
+	const backendID = "codex"
+	manager.executor = schedulerBenchmarkExecutor{id: backendID}
 
 	reg := registry.GetGlobalRegistry()
 	model := "bench-model"
 	for index := 0; index < total; index++ {
-		auth := &Auth{ID: fmt.Sprintf("bench-%s-%04d", provider, index), Provider: provider}
+		auth := &Auth{ID: fmt.Sprintf("bench-%s-%04d", backendID, index), Provider: backendID}
 		if withPriority {
 			priority := "0"
 			if index%2 == 0 {
@@ -62,7 +62,7 @@ func benchmarkManagerSetup(b *testing.B, total int, withPriority bool) (*Manager
 	manager.syncScheduler()
 	b.Cleanup(func() {
 		for index := 0; index < total; index++ {
-			reg.UnregisterClient(fmt.Sprintf("bench-%s-%04d", provider, index))
+			reg.UnregisterClient(fmt.Sprintf("bench-%s-%04d", backendID, index))
 		}
 	})
 

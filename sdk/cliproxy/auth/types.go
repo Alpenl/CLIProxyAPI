@@ -47,7 +47,7 @@ type Auth struct {
 	ID string `json:"id"`
 	// Index is a stable runtime identifier derived from auth metadata (not persisted).
 	Index string `json:"-"`
-	// Provider is the upstream provider key. This branch only uses "codex".
+	// Provider stores the auth-type identifier. This branch only uses "codex".
 	Provider string `json:"provider"`
 	// Prefix optionally namespaces models for routing (e.g., "teamA/gpt-5-codex").
 	Prefix string `json:"prefix,omitempty"`
@@ -63,13 +63,13 @@ type Auth struct {
 	StatusMessage string `json:"status_message,omitempty"`
 	// Disabled indicates the auth is intentionally disabled by operator.
 	Disabled bool `json:"disabled"`
-	// Unavailable flags transient provider unavailability (e.g. quota exceeded).
+	// Unavailable flags transient upstream unavailability (e.g. quota exceeded).
 	Unavailable bool `json:"unavailable"`
 	// ProxyURL overrides the global proxy setting for this auth if provided.
 	ProxyURL string `json:"proxy_url,omitempty"`
-	// Attributes stores provider specific metadata needed by executors (immutable configuration).
+	// Attributes stores auth/runtime metadata needed by execution backends (immutable configuration).
 	Attributes map[string]string `json:"attributes,omitempty"`
-	// Metadata stores runtime mutable provider state (e.g. tokens, cookies).
+	// Metadata stores runtime mutable auth state (e.g. tokens, cookies).
 	Metadata map[string]any `json:"metadata,omitempty"`
 	// Quota captures recent quota information for load balancers.
 	Quota QuotaState `json:"quota"`
@@ -98,7 +98,7 @@ type Auth struct {
 type QuotaState struct {
 	// Exceeded indicates the credential recently hit a quota error.
 	Exceeded bool `json:"exceeded"`
-	// Reason provides an optional provider specific human readable description.
+	// Reason provides an optional upstream-specific human readable description.
 	Reason string `json:"reason,omitempty"`
 	// NextRecoverAt is when the credential may become available again.
 	NextRecoverAt time.Time `json:"next_recover_at"`

@@ -1,11 +1,11 @@
-// Package constant defines protocol and provider identifiers used by the remaining Codex/OpenAI path.
+// Package constant defines protocol and auth-type identifiers used by the remaining Codex/OpenAI path.
 package constant
 
 const (
-	// Codex represents the OpenAI Codex provider identifier.
+	// Codex represents the Codex auth-type identifier used throughout the runtime.
 	Codex = "codex"
 
-	// OpenAI represents the OpenAI provider identifier.
+	// OpenAI represents the OpenAI-compatible request format identifier.
 	OpenAI = "openai"
 
 	// OpenaiResponse represents the OpenAI response format identifier.

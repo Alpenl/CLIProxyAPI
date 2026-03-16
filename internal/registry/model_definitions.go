@@ -42,7 +42,7 @@ func cloneModelInfos(models []*ModelInfo) []*ModelInfo {
 	return out
 }
 
-// GetStaticModelDefinitionsByChannel returns static model definitions for a given channel/provider.
+// GetStaticModelDefinitionsByChannel returns static model definitions for a given channel key.
 // Only the Codex channel remains supported.
 func GetStaticModelDefinitionsByChannel(channel string) []*ModelInfo {
 	if strings.EqualFold(strings.TrimSpace(channel), "codex") {
