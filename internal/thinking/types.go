@@ -2,8 +2,6 @@
 // for the proxy's supported thinking-capable request formats.
 package thinking
 
-import "github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
-
 // ThinkingMode represents the type of thinking configuration mode.
 type ThinkingMode int
 
@@ -89,28 +87,4 @@ type SuffixResult struct {
 	// RawSuffix is the content inside the parentheses, without the parentheses.
 	// Empty string if HasSuffix is false.
 	RawSuffix string
-}
-
-// ProviderApplier defines the interface for provider-specific thinking configuration application.
-//
-// Types implementing this interface are responsible for converting a unified ThinkingConfig
-// into provider-specific format and applying it to the request body.
-//
-// Implementation requirements:
-//   - Apply method must be idempotent
-//   - Must not modify the input config or modelInfo
-//   - Returns a modified copy of the request body
-//   - Returns appropriate ThinkingError for unsupported configurations
-type ProviderApplier interface {
-	// Apply applies the thinking configuration to the request body.
-	//
-	// Parameters:
-	//   - body: Original request body JSON
-	//   - config: Unified thinking configuration
-	//   - modelInfo: Model registry information containing ThinkingSupport properties
-	//
-	// Returns:
-	//   - Modified request body JSON
-	//   - ThinkingError if the configuration is invalid or unsupported
-	Apply(body []byte, config ThinkingConfig, modelInfo *registry.ModelInfo) ([]byte, error)
 }

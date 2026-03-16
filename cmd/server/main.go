@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/cmd"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
@@ -71,7 +69,6 @@ func main() {
 	// Register file-backed persistence for Codex auth JSON files.
 	sdkAuth.RegisterTokenStore(sdkAuth.NewFileTokenStore())
 
-	registry.StartModelsUpdater(context.Background())
 	cmd.StartService(cfg, resolvedConfigPath, "")
 }
 

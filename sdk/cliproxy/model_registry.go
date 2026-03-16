@@ -15,7 +15,7 @@ type ModelRegistry interface {
 	SetModelQuotaExceeded(clientID, modelID string)
 	ClearModelQuotaExceeded(clientID, modelID string)
 	ClientSupportsModel(clientID, modelID string) bool
-	GetAvailableModels(handlerType string) []map[string]any
+	GetAvailableModels() []map[string]any
 	GetAvailableCodexModels() []*ModelInfo
 	GetModelsForClient(clientID string) []*ModelInfo
 }

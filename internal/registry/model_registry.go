@@ -113,8 +113,8 @@ type ModelRegistry struct {
 	clientModelInfos map[string]map[string]*ModelInfo
 	// mutex ensures thread-safe access to the registry
 	mutex *sync.RWMutex
-	// availableModelsCache stores per-handler snapshots for GetAvailableModels.
-	availableModelsCache map[string]availableModelsCacheEntry
+	// availableModelsCache stores the OpenAI-compatible model snapshot for GetAvailableModels.
+	availableModelsCache *availableModelsCacheEntry
 	// hook is an optional callback sink for model registration changes
 	hook ModelRegistryHook
 }
@@ -127,26 +127,22 @@ var registryOnce sync.Once
 func GetGlobalRegistry() *ModelRegistry {
 	registryOnce.Do(func() {
 		globalRegistry = &ModelRegistry{
-			models:               make(map[string]*ModelRegistration),
-			clientModels:         make(map[string][]string),
-			clientModelInfos:     make(map[string]map[string]*ModelInfo),
-			availableModelsCache: make(map[string]availableModelsCacheEntry),
-			mutex:                &sync.RWMutex{},
+			models:           make(map[string]*ModelRegistration),
+			clientModels:     make(map[string][]string),
+			clientModelInfos: make(map[string]map[string]*ModelInfo),
+			mutex:            &sync.RWMutex{},
 		}
 	})
 	return globalRegistry
 }
 func (r *ModelRegistry) ensureAvailableModelsCacheLocked() {
-	if r.availableModelsCache == nil {
-		r.availableModelsCache = make(map[string]availableModelsCacheEntry)
-	}
 }
 
 func (r *ModelRegistry) invalidateAvailableModelsCacheLocked() {
-	if len(r.availableModelsCache) == 0 {
+	if r.availableModelsCache == nil {
 		return
 	}
-	clear(r.availableModelsCache)
+	r.availableModelsCache = nil
 }
 
 // LookupModelInfo searches dynamic registry then static definitions.
@@ -623,15 +619,14 @@ func (r *ModelRegistry) ClientSupportsModel(clientID, modelID string) bool {
 }
 
 // GetAvailableModels returns all models that have at least one available client.
-// handlerType is currently expected to be an OpenAI-compatible handler key.
 //
 // Returns:
-//   - []map[string]any: List of available models in the requested format
-func (r *ModelRegistry) GetAvailableModels(handlerType string) []map[string]any {
+//   - []map[string]any: List of available models in OpenAI-compatible format
+func (r *ModelRegistry) GetAvailableModels() []map[string]any {
 	now := time.Now()
 
 	r.mutex.RLock()
-	if cache, ok := r.availableModelsCache[handlerType]; ok && (cache.expiresAt.IsZero() || now.Before(cache.expiresAt)) {
+	if cache := r.availableModelsCache; cache != nil && (cache.expiresAt.IsZero() || now.Before(cache.expiresAt)) {
 		models := cloneModelMaps(cache.models)
 		r.mutex.RUnlock()
 		return models
@@ -640,14 +635,13 @@ func (r *ModelRegistry) GetAvailableModels(handlerType string) []map[string]any 
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.ensureAvailableModelsCacheLocked()
 
-	if cache, ok := r.availableModelsCache[handlerType]; ok && (cache.expiresAt.IsZero() || now.Before(cache.expiresAt)) {
+	if cache := r.availableModelsCache; cache != nil && (cache.expiresAt.IsZero() || now.Before(cache.expiresAt)) {
 		return cloneModelMaps(cache.models)
 	}
 
-	models, expiresAt := r.buildAvailableModelsLocked(handlerType, now)
-	r.availableModelsCache[handlerType] = availableModelsCacheEntry{
+	models, expiresAt := r.buildAvailableModelsLocked(now)
+	r.availableModelsCache = &availableModelsCacheEntry{
 		models:    cloneModelMaps(models),
 		expiresAt: expiresAt,
 	}
@@ -655,7 +649,7 @@ func (r *ModelRegistry) GetAvailableModels(handlerType string) []map[string]any 
 	return models
 }
 
-func (r *ModelRegistry) buildAvailableModelsLocked(handlerType string, now time.Time) ([]map[string]any, time.Time) {
+func (r *ModelRegistry) buildAvailableModelsLocked(now time.Time) ([]map[string]any, time.Time) {
 	models := make([]map[string]any, 0, len(r.models))
 	var expiresAt time.Time
 
@@ -694,7 +688,7 @@ func (r *ModelRegistry) buildAvailableModelsLocked(handlerType string, now time.
 		}
 
 		if effectiveClients > 0 || (availableClients > 0 && (expiredClients > 0 || cooldownSuspended > 0) && otherSuspended == 0) {
-			model := r.convertModelToMap(registration.Info, handlerType)
+			model := r.convertModelToMap(registration.Info)
 			if model != nil {
 				models = append(models, model)
 			}
@@ -831,62 +825,43 @@ func (r *ModelRegistry) GetModelInfo(modelID string) *ModelInfo {
 	return nil
 }
 
-// convertModelToMap converts ModelInfo to the appropriate handler format.
-func (r *ModelRegistry) convertModelToMap(model *ModelInfo, handlerType string) map[string]any {
+// convertModelToMap converts ModelInfo to the single OpenAI-compatible model list format
+// served by the remaining Codex-only API surface.
+func (r *ModelRegistry) convertModelToMap(model *ModelInfo) map[string]any {
 	if model == nil {
 		return nil
 	}
 
-	switch handlerType {
-	case "openai":
-		result := map[string]any{
-			"id":       model.ID,
-			"object":   "model",
-			"owned_by": model.OwnedBy,
-		}
-		if model.Created > 0 {
-			result["created"] = model.Created
-		}
-		if model.Type != "" {
-			result["type"] = model.Type
-		}
-		if model.DisplayName != "" {
-			result["display_name"] = model.DisplayName
-		}
-		if model.Version != "" {
-			result["version"] = model.Version
-		}
-		if model.Description != "" {
-			result["description"] = model.Description
-		}
-		if model.ContextLength > 0 {
-			result["context_length"] = model.ContextLength
-		}
-		if model.MaxCompletionTokens > 0 {
-			result["max_completion_tokens"] = model.MaxCompletionTokens
-		}
-		if len(model.SupportedParameters) > 0 {
-			result["supported_parameters"] = append([]string(nil), model.SupportedParameters...)
-		}
-		return result
-
-	default:
-		// Generic format
-		result := map[string]any{
-			"id":     model.ID,
-			"object": "model",
-		}
-		if model.OwnedBy != "" {
-			result["owned_by"] = model.OwnedBy
-		}
-		if model.Type != "" {
-			result["type"] = model.Type
-		}
-		if model.Created != 0 {
-			result["created"] = model.Created
-		}
-		return result
+	result := map[string]any{
+		"id":       model.ID,
+		"object":   "model",
+		"owned_by": model.OwnedBy,
 	}
+	if model.Created > 0 {
+		result["created"] = model.Created
+	}
+	if model.Type != "" {
+		result["type"] = model.Type
+	}
+	if model.DisplayName != "" {
+		result["display_name"] = model.DisplayName
+	}
+	if model.Version != "" {
+		result["version"] = model.Version
+	}
+	if model.Description != "" {
+		result["description"] = model.Description
+	}
+	if model.ContextLength > 0 {
+		result["context_length"] = model.ContextLength
+	}
+	if model.MaxCompletionTokens > 0 {
+		result["max_completion_tokens"] = model.MaxCompletionTokens
+	}
+	if len(model.SupportedParameters) > 0 {
+		result["supported_parameters"] = append([]string(nil), model.SupportedParameters...)
+	}
+	return result
 }
 
 // CleanupExpiredQuotas removes expired quota tracking entries
@@ -911,22 +886,19 @@ func (r *ModelRegistry) CleanupExpiredQuotas() {
 	}
 }
 
-// GetFirstAvailableModel returns the first available model for the given handler type.
+// GetFirstAvailableModel returns the first available model from the shared model list.
 // It prioritizes models by their creation timestamp (newest first) and checks if they have
 // available clients that are not suspended or over quota.
-//
-// Parameters:
-//   - handlerType: The API handler type (for example "openai")
 //
 // Returns:
 //   - string: The model ID of the first available model, or empty string if none available
 //   - error: An error if no models are available
-func (r *ModelRegistry) GetFirstAvailableModel(handlerType string) (string, error) {
+func (r *ModelRegistry) GetFirstAvailableModel() (string, error) {
 
-	// Get all available models for this handler type
-	models := r.GetAvailableModels(handlerType)
+	// Get all available models from the shared list.
+	models := r.GetAvailableModels()
 	if len(models) == 0 {
-		return "", fmt.Errorf("no models available for handler type: %s", handlerType)
+		return "", fmt.Errorf("no models available")
 	}
 
 	// Sort models by creation timestamp (newest first)
@@ -949,7 +921,7 @@ func (r *ModelRegistry) GetFirstAvailableModel(handlerType string) (string, erro
 		}
 	}
 
-	return "", fmt.Errorf("no available clients for any model in handler type: %s", handlerType)
+	return "", fmt.Errorf("no available clients for any model")
 }
 
 // GetModelsForClient returns the models registered for a specific client.

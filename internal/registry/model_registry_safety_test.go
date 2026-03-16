@@ -87,7 +87,7 @@ func TestCleanupExpiredQuotasInvalidatesAvailableModelsCache(t *testing.T) {
 	r := newTestModelRegistry()
 	r.RegisterClient("client-1", []*ModelInfo{{ID: "m1", Created: 1}})
 	r.SetModelQuotaExceeded("client-1", "m1")
-	if models := r.GetAvailableModels("openai"); len(models) != 1 {
+	if models := r.GetAvailableModels(); len(models) != 1 {
 		t.Fatalf("expected cooldown model to remain listed before cleanup, got %d", len(models))
 	}
 
@@ -101,7 +101,7 @@ func TestCleanupExpiredQuotasInvalidatesAvailableModelsCache(t *testing.T) {
 	if count := r.GetModelCount("m1"); count != 1 {
 		t.Fatalf("expected model count 1 after cleanup, got %d", count)
 	}
-	models := r.GetAvailableModels("openai")
+	models := r.GetAvailableModels()
 	if len(models) != 1 {
 		t.Fatalf("expected model to stay available after cleanup, got %d", len(models))
 	}
@@ -118,7 +118,7 @@ func TestGetAvailableModelsReturnsClonedSupportedParameters(t *testing.T) {
 		SupportedParameters: []string{"temperature", "top_p"},
 	}})
 
-	first := r.GetAvailableModels("openai")
+	first := r.GetAvailableModels()
 	if len(first) != 1 {
 		t.Fatalf("expected one model, got %d", len(first))
 	}
@@ -128,7 +128,7 @@ func TestGetAvailableModelsReturnsClonedSupportedParameters(t *testing.T) {
 	}
 	params[0] = "mutated"
 
-	second := r.GetAvailableModels("openai")
+	second := r.GetAvailableModels()
 	params, ok = second[0]["supported_parameters"].([]string)
 	if !ok || len(params) != 2 || params[0] != "temperature" {
 		t.Fatalf("expected cloned supported_parameters, got %#v", second[0]["supported_parameters"])

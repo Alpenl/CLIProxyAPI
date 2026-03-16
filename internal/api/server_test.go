@@ -92,26 +92,6 @@ func TestServerRegistersOnlyCodexRoutes(t *testing.T) {
 			wantAny: []int{http.StatusUnauthorized, http.StatusOK},
 		},
 		{
-			name:   "chat completions endpoint exists",
-			method: http.MethodPost,
-			path:   "/v1/chat/completions",
-			body:   bytes.NewBufferString(`{}`),
-			headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			wantAny: []int{http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
-		},
-		{
-			name:   "completions endpoint exists",
-			method: http.MethodPost,
-			path:   "/v1/completions",
-			body:   bytes.NewBufferString(`{}`),
-			headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			wantAny: []int{http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
-		},
-		{
 			name:   "responses endpoint exists",
 			method: http.MethodPost,
 			path:   "/v1/responses",
@@ -218,6 +198,8 @@ func TestServerRemovesLegacyRoutes(t *testing.T) {
 		{name: "legacy routed models endpoint removed", method: http.MethodGet, path: "/api/provider/openai/models"},
 		{name: "legacy oauth callback removed", method: http.MethodGet, path: "/anthropic/callback"},
 		{name: "legacy management callback relay removed", method: http.MethodPost, path: "/v0/management/oauth-callback"},
+		{name: "chat completions endpoint removed", method: http.MethodPost, path: "/v1/chat/completions"},
+		{name: "completions endpoint removed", method: http.MethodPost, path: "/v1/completions"},
 	}
 
 	for _, tc := range testCases {
@@ -287,7 +269,7 @@ func TestDefaultRequestLoggerFactory_UsesResolvedLogDirectory(t *testing.T) {
 	fileLogger := logger
 
 	errLog := fileLogger.LogRequestWithOptions(
-		"/v1/chat/completions",
+		"/v1/responses",
 		http.MethodPost,
 		map[string][]string{"Content-Type": []string{"application/json"}},
 		[]byte(`{"input":"hello"}`),

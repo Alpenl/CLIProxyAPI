@@ -9,28 +9,11 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-// providerAppliers maps provider names to their ProviderApplier implementations.
-var providerAppliers = map[string]ProviderApplier{
-	"openai": nil,
-	"codex":  nil,
-}
-
-// GetProviderApplier returns the ProviderApplier for the given provider name.
-// Returns nil if the provider is not registered.
-func GetProviderApplier(provider string) ProviderApplier {
-	return providerAppliers[provider]
-}
-
-// RegisterProvider registers a provider applier by name.
-func RegisterProvider(name string, applier ProviderApplier) {
-	providerAppliers[name] = applier
-}
-
 // IsUserDefinedModel reports whether the model is a user-defined model that should
 // have thinking configuration passed through without validation.
 //
 // User-defined models are configured via config file model mapping arrays
-// (for example, codex-api-key[].models[]). These models
+// owned by legacy provider credential blocks. These models
 // are marked with UserDefined=true at registration time.
 //
 // User-defined models should have their thinking configuration applied directly,
@@ -44,7 +27,7 @@ func IsUserDefinedModel(modelInfo *registry.ModelInfo) bool {
 
 // ApplyThinking applies thinking configuration to a request body.
 //
-// This is the unified entry point for all providers. It follows the processing
+// This is the unified entry point for the remaining Codex-compatible request formats. It follows the processing
 // order defined in FR25: route check → model capability query → config extraction
 // → validation → application.
 //
@@ -65,7 +48,7 @@ func IsUserDefinedModel(modelInfo *registry.ModelInfo) bool {
 //     is returned (not nil) to enable defensive programming patterns.
 //
 // Passthrough behavior (returns original body without error):
-//   - Unknown provider (not in providerAppliers map)
+//   - Unsupported target format
 //   - modelInfo.Thinking is nil (model doesn't support thinking)
 //
 // Note: Unknown models (modelInfo is nil) are treated as user-defined models: we skip
@@ -84,13 +67,12 @@ func ApplyThinking(body []byte, model string, fromFormat string, toFormat string
 	if fromFormat == "" {
 		fromFormat = providerFormat
 	}
-	// 1. Route check: Get provider applier
-	applier := GetProviderApplier(providerFormat)
-	if applier == nil {
+	// 1. Route check: verify that the target format is still supported.
+	if !supportsThinkingFormat(providerFormat) {
 		log.WithFields(log.Fields{
 			"provider": providerFormat,
 			"model":    model,
-		}).Debug("thinking: unknown target format, passthrough |")
+		}).Debug("thinking: unsupported target format, passthrough |")
 		return body, nil
 	}
 
@@ -184,8 +166,8 @@ func ApplyThinking(body []byte, model string, fromFormat string, toFormat string
 		"level":    validated.Level,
 	}).Debug("thinking: processed config to apply |")
 
-	// 6. Apply configuration using provider-specific applier
-	return applier.Apply(body, *validated, modelInfo)
+	// 6. Apply configuration using the remaining Codex-compatible formatter.
+	return applyThinkingConfig(body, *validated, modelInfo, providerFormat)
 }
 
 // parseSuffixToConfig converts a raw suffix string to ThinkingConfig.
@@ -259,12 +241,11 @@ func applyUserDefinedModel(body []byte, modelInfo *registry.ModelInfo, fromForma
 		return body, nil
 	}
 
-	applier := GetProviderApplier(toFormat)
-	if applier == nil {
+	if !supportsThinkingFormat(toFormat) {
 		log.WithFields(log.Fields{
 			"model":    modelID,
 			"provider": toFormat,
-		}).Debug("thinking: user-defined model, passthrough (unknown target format) |")
+		}).Debug("thinking: user-defined model, passthrough (unsupported target format) |")
 		return body, nil
 	}
 
@@ -277,7 +258,7 @@ func applyUserDefinedModel(body []byte, modelInfo *registry.ModelInfo, fromForma
 	}).Debug("thinking: applying config for user-defined model (skip validation)")
 
 	config = normalizeUserDefinedConfig(config, fromFormat, toFormat)
-	return applier.Apply(body, config, modelInfo)
+	return applyThinkingConfig(body, config, modelInfo, toFormat)
 }
 
 func normalizeUserDefinedConfig(config ThinkingConfig, fromFormat, toFormat string) ThinkingConfig {
@@ -286,7 +267,7 @@ func normalizeUserDefinedConfig(config ThinkingConfig, fromFormat, toFormat stri
 	return config
 }
 
-// extractThinkingConfig extracts provider-specific thinking config from request body.
+// extractThinkingConfig extracts thinking config from the supported request body formats.
 func extractThinkingConfig(body []byte, provider string) ThinkingConfig {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return ThinkingConfig{}
@@ -306,13 +287,7 @@ func hasThinkingConfig(config ThinkingConfig) bool {
 	return config.Mode != ModeBudget || config.Budget != 0 || config.Level != ""
 }
 
-// extractOpenAIConfig extracts thinking configuration from OpenAI chat-completions request bodies.
-//
-// OpenAI API format:
-//   - reasoning_effort: "none", "low", "medium", "high" (discrete levels)
-//
-// OpenAI uses level-based thinking configuration only, no numeric budget support.
-// The "none" value is treated specially to return ModeNone.
+// extractOpenAIConfig extracts legacy flat reasoning configuration from request bodies.
 func extractOpenAIConfig(body []byte) ThinkingConfig {
 	// Check reasoning_effort (OpenAI Chat Completions format)
 	if effort := gjson.GetBytes(body, "reasoning_effort"); effort.Exists() {

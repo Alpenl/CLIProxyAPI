@@ -67,15 +67,6 @@ type Service struct {
 	shutdownOnce sync.Once
 }
 
-// RegisterUsagePlugin registers a usage plugin on the global usage manager.
-// This allows external code to monitor API usage and token consumption.
-//
-// Parameters:
-//   - plugin: The usage plugin to register
-func (s *Service) RegisterUsagePlugin(plugin usage.Plugin) {
-	usage.RegisterPlugin(plugin)
-}
-
 func (s *Service) ensureAuthUpdateQueue(ctx context.Context) {
 	if s == nil {
 		return
@@ -339,46 +330,6 @@ func (s *Service) Run(ctx context.Context) error {
 		s.hooks.OnBeforeStart(s.cfg)
 	}
 
-	// Register callback for startup and periodic model catalog refresh.
-	// When the Codex catalog changes, rebuild auth registrations from the latest
-	// model snapshot instead of preserving previous suppression state.
-	// This intentionally rebuilds per-auth model availability from the latest catalog
-	// snapshot instead of preserving prior registry suppression state.
-	registry.SetModelRefreshCallback(func(changedCatalogKeys []string) {
-		if s == nil || s.coreManager == nil || len(changedCatalogKeys) == 0 {
-			return
-		}
-		changed := false
-		for _, changedKey := range changedCatalogKeys {
-			if strings.EqualFold(strings.TrimSpace(changedKey), "codex") {
-				changed = true
-				break
-			}
-		}
-		if !changed {
-			return
-		}
-
-		auths := s.coreManager.List()
-		refreshed := 0
-		for _, item := range auths {
-			if item == nil || item.ID == "" {
-				continue
-			}
-			auth, ok := s.coreManager.GetByID(item.ID)
-			if !ok || auth == nil || auth.Disabled {
-				continue
-			}
-			if s.refreshModelRegistrationForAuth(auth) {
-				refreshed++
-			}
-		}
-
-		if refreshed > 0 {
-			log.Infof("re-registered models for %d auth(s) after Codex model catalog refresh", refreshed)
-		}
-	})
-
 	s.serverErr = make(chan error, 1)
 	go func() {
 		if errStart := s.server.Start(); errStart != nil {
@@ -608,94 +559,13 @@ func (s *Service) registerModelsForAuth(a *coreauth.Auth) {
 	default:
 		models = registry.GetCodexProModels()
 	}
-	if entry := s.resolveConfigCodexKey(a); entry != nil {
-		if len(entry.Models) > 0 {
-			models = buildCodexConfigModels(entry)
-		}
-		if authKind == "apikey" || len(excluded) == 0 {
-			excluded = entry.ExcludedModels
-		}
-	}
 	models = applyExcludedModels(models, excluded)
 	if len(models) > 0 {
-		s.registerResolvedModelsForAuth(a, applyModelPrefixes(models, a.Prefix, s.cfg != nil && s.cfg.ForceModelPrefix))
+		s.registerResolvedModelsForAuth(a, applyModelPrefixes(models, a.Prefix))
 		return
 	}
 
 	GlobalModelRegistry().UnregisterClient(a.ID)
-}
-
-// refreshModelRegistrationForAuth re-applies the latest model registration for
-// one auth and reconciles any concurrent auth changes that race with the
-// refresh.
-//
-// Re-registration is deliberate: registry cooldown/suspension state is treated
-// as part of the previous registration snapshot and is cleared when the auth is
-// rebound to the refreshed model catalog.
-func (s *Service) refreshModelRegistrationForAuth(current *coreauth.Auth) bool {
-	if s == nil || s.coreManager == nil || current == nil || current.ID == "" {
-		return false
-	}
-
-	if !current.Disabled {
-		s.ensureExecutorsForAuth(current)
-	}
-	s.registerModelsForAuth(current)
-
-	latest, ok := s.latestAuthForModelRegistration(current.ID)
-	if !ok || latest.Disabled {
-		GlobalModelRegistry().UnregisterClient(current.ID)
-		s.coreManager.RefreshSchedulerEntry(current.ID)
-		return false
-	}
-
-	// Re-apply the latest auth snapshot so concurrent auth updates cannot leave
-	// stale model registrations behind. This may duplicate registration work when
-	// no auth fields changed, but keeps the refresh path simple and correct.
-	s.ensureExecutorsForAuth(latest)
-	s.registerModelsForAuth(latest)
-	s.coreManager.RefreshSchedulerEntry(current.ID)
-	return true
-}
-
-// latestAuthForModelRegistration returns the latest auth snapshot. Callers use
-// this after a registration attempt to restore
-// whichever state currently owns the client ID in the global registry.
-func (s *Service) latestAuthForModelRegistration(authID string) (*coreauth.Auth, bool) {
-	if s == nil || s.coreManager == nil || authID == "" {
-		return nil, false
-	}
-	auth, ok := s.coreManager.GetByID(authID)
-	if !ok || auth == nil || auth.ID == "" {
-		return nil, false
-	}
-	return auth, true
-}
-
-func (s *Service) resolveConfigCodexKey(auth *coreauth.Auth) *config.CodexKey {
-	if auth == nil || s.cfg == nil {
-		return nil
-	}
-	var attrKey, attrBase string
-	if auth.Attributes != nil {
-		attrKey = strings.TrimSpace(auth.Attributes["api_key"])
-		attrBase = strings.TrimSpace(auth.Attributes["base_url"])
-	}
-	for i := range s.cfg.CodexKey {
-		entry := &s.cfg.CodexKey[i]
-		cfgKey := strings.TrimSpace(entry.APIKey)
-		cfgBase := strings.TrimSpace(entry.BaseURL)
-		if attrKey != "" && strings.EqualFold(cfgKey, attrKey) {
-			if cfgBase == "" || strings.EqualFold(cfgBase, attrBase) {
-				return entry
-			}
-			continue
-		}
-		if attrKey == "" && attrBase != "" && strings.EqualFold(cfgBase, attrBase) {
-			return entry
-		}
-	}
-	return nil
 }
 
 func applyExcludedModels(models []*ModelInfo, excluded []string) []*ModelInfo {
@@ -733,7 +603,7 @@ func applyExcludedModels(models []*ModelInfo, excluded []string) []*ModelInfo {
 	return filtered
 }
 
-func applyModelPrefixes(models []*ModelInfo, prefix string, forceModelPrefix bool) []*ModelInfo {
+func applyModelPrefixes(models []*ModelInfo, prefix string) []*ModelInfo {
 	trimmedPrefix := strings.TrimSpace(prefix)
 	if trimmedPrefix == "" || len(models) == 0 {
 		return models
@@ -765,9 +635,7 @@ func applyModelPrefixes(models []*ModelInfo, prefix string, forceModelPrefix boo
 		if baseID == "" {
 			continue
 		}
-		if !forceModelPrefix || trimmedPrefix == baseID {
-			addModel(model)
-		}
+		addModel(model)
 		clone := *model
 		clone.ID = trimmedPrefix + "/" + baseID
 		addModel(&clone)
@@ -817,87 +685,4 @@ func matchWildcard(pattern, value string) bool {
 	}
 
 	return true
-}
-
-type modelEntry interface {
-	GetName() string
-	GetAlias() string
-}
-
-func buildConfigModels[T modelEntry](models []T, ownedBy, modelType string) []*ModelInfo {
-	if len(models) == 0 {
-		return nil
-	}
-	now := time.Now().Unix()
-	out := make([]*ModelInfo, 0, len(models))
-	seen := make(map[string]struct{}, len(models))
-	for i := range models {
-		model := models[i]
-		name := strings.TrimSpace(model.GetName())
-		alias := strings.TrimSpace(model.GetAlias())
-		if alias == "" {
-			alias = name
-		}
-		if alias == "" {
-			continue
-		}
-		key := strings.ToLower(alias)
-		if _, exists := seen[key]; exists {
-			continue
-		}
-		seen[key] = struct{}{}
-		display := name
-		if display == "" {
-			display = alias
-		}
-		info := &ModelInfo{
-			ID:          alias,
-			Object:      "model",
-			Created:     now,
-			OwnedBy:     ownedBy,
-			Type:        modelType,
-			DisplayName: display,
-			UserDefined: true,
-		}
-		if name != "" {
-			if upstream := registry.LookupStaticModelInfo(name); upstream != nil && upstream.Thinking != nil {
-				info.Thinking = upstream.Thinking
-			}
-		}
-		out = append(out, info)
-	}
-	return out
-}
-
-func buildCodexConfigModels(entry *config.CodexKey) []*ModelInfo {
-	if entry == nil {
-		return nil
-	}
-	return buildConfigModels(entry.Models, "openai", "openai")
-}
-
-func rewriteModelInfoName(name, oldID, newID string) string {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return name
-	}
-	oldID = strings.TrimSpace(oldID)
-	newID = strings.TrimSpace(newID)
-	if oldID == "" || newID == "" {
-		return name
-	}
-	if strings.EqualFold(oldID, newID) {
-		return name
-	}
-	if strings.EqualFold(trimmed, oldID) {
-		return newID
-	}
-	if strings.HasSuffix(trimmed, "/"+oldID) {
-		prefix := strings.TrimSuffix(trimmed, oldID)
-		return prefix + newID
-	}
-	if trimmed == "models/"+oldID {
-		return "models/" + newID
-	}
-	return name
 }

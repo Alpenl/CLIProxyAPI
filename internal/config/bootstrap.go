@@ -55,7 +55,7 @@ func DefaultBootstrapConfig() *Config {
 		Host:                   "",
 		Port:                   8317,
 		TLS:                    TLSConfig{},
-		RemoteManagement:       RemoteManagement{AllowRemote: true, SecretKey: "", DisableControlPanel: false},
+		RemoteManagement:       RemoteManagement{AllowRemote: true, SecretKey: ""},
 		AuthDir:                "./auths",
 		Debug:                  false,
 		LoggingToFile:          false,
@@ -67,7 +67,6 @@ func DefaultBootstrapConfig() *Config {
 		MaxRetryCredentials:    0,
 		MaxRetryInterval:       30,
 		Routing:                RoutingConfig{Strategy: "round-robin"},
-		WebsocketAuth:          false,
 	}
 }
 

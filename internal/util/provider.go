@@ -10,7 +10,7 @@ import (
 )
 
 // ResolveAutoModel resolves the "auto" model name to an actual available model.
-// It uses an empty handler type to get any available model from the registry.
+// It uses the shared OpenAI-compatible model list from the registry.
 //
 // Parameters:
 //   - modelName: The model name to check (should be "auto")
@@ -22,8 +22,7 @@ func ResolveAutoModel(modelName string) string {
 		return modelName
 	}
 
-	// Use empty string as handler type to get any available model
-	firstModel, err := registry.GetGlobalRegistry().GetFirstAvailableModel("")
+	firstModel, err := registry.GetGlobalRegistry().GetFirstAvailableModel()
 	if err != nil {
 		log.Warnf("Failed to resolve 'auto' model: %v, falling back to original model name", err)
 		return modelName

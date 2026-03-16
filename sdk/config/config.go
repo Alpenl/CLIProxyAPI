@@ -14,13 +14,7 @@ type StreamingConfig = internalconfig.StreamingConfig
 type TLSConfig = internalconfig.TLSConfig
 type RemoteManagement = internalconfig.RemoteManagement
 
-type CodexKey = internalconfig.CodexKey
-
 type TLS = internalconfig.TLSConfig
-
-const (
-	DefaultPanelGitHubRepository = internalconfig.DefaultPanelGitHubRepository
-)
 
 func LoadConfig(configFile string) (*Config, error) { return internalconfig.LoadConfig(configFile) }
 

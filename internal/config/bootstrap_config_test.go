@@ -51,4 +51,16 @@ func TestLoadOrCreateConfig_CreatesBootstrapConfigWhenMissing(t *testing.T) {
 	if !strings.Contains(content, "secret-key: \"\"") {
 		t.Fatalf("generated config missing empty secret-key field: %s", content)
 	}
+	if strings.Contains(content, "disable-control-panel:") {
+		t.Fatalf("generated config should not include disable-control-panel: %s", content)
+	}
+	if strings.Contains(content, "panel-github-repository:") {
+		t.Fatalf("generated config should not include panel-github-repository: %s", content)
+	}
+	if strings.Contains(content, "ws-auth:") {
+		t.Fatalf("generated config should not include ws-auth: %s", content)
+	}
+	if strings.Contains(content, "quota-exceeded:") {
+		t.Fatalf("generated config should not include quota-exceeded: %s", content)
+	}
 }

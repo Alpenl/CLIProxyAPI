@@ -37,7 +37,7 @@ func TestNormalizeAuthStripsTemporalFields(t *testing.T) {
 	}
 }
 
-func TestSnapshotCoreAuths_ConfigAndAuthFiles_CodexOnly(t *testing.T) {
+func TestSnapshotCoreAuths_UsesAuthFilesOnly(t *testing.T) {
 	authDir := t.TempDir()
 	fileData, err := json.Marshal(map[string]any{
 		"type":  "codex",
@@ -53,16 +53,14 @@ func TestSnapshotCoreAuths_ConfigAndAuthFiles_CodexOnly(t *testing.T) {
 
 	w := &Watcher{authDir: authDir}
 	w.SetConfig(&config.Config{
-		AuthDir:  authDir,
-		CodexKey: []config.CodexKey{{APIKey: "codex-key", BaseURL: "https://codex.example.com"}},
+		AuthDir: authDir,
 	})
 
 	auths := w.SnapshotCoreAuths()
-	if len(auths) != 2 {
-		t.Fatalf("expected 2 auth entries (1 config + 1 file), got %d", len(auths))
+	if len(auths) != 1 {
+		t.Fatalf("expected 1 auth entry from file store, got %d", len(auths))
 	}
 
-	seenConfig := false
 	seenFile := false
 	for _, auth := range auths {
 		if auth == nil {
@@ -71,15 +69,9 @@ func TestSnapshotCoreAuths_ConfigAndAuthFiles_CodexOnly(t *testing.T) {
 		if auth.Provider != "codex" {
 			t.Fatalf("expected only auth type codex, got %s", auth.Provider)
 		}
-		if auth.Attributes["api_key"] == "codex-key" {
-			seenConfig = true
-		}
 		if auth.Attributes["path"] == authFile {
 			seenFile = true
 		}
-	}
-	if !seenConfig {
-		t.Fatal("expected config-backed codex auth")
 	}
 	if !seenFile {
 		t.Fatal("expected file-backed codex auth")

@@ -21,9 +21,6 @@ remote-management:
   # The same key is required by the embedded web console.
   secret-key: "change-this-management-key"
 
-  # Leave false to enable the embedded Codex Console.
-  disable-control-panel: false
-
 # Directory that stores Codex OAuth JSON files.
 # You can import files here from the web console or copy them in directly.
 auth-dir: "~/.cli-proxy-api"
@@ -41,8 +38,6 @@ usage-statistics-enabled: true
 
 # Global upstream proxy. Leave empty for direct access.
 proxy-url: ""
-
-force-model-prefix: false
 passthrough-headers: false
 
 # Retry behavior for Codex account pool failover.
@@ -50,14 +45,9 @@ request-retry: 3
 max-retry-credentials: 0
 max-retry-interval: 30
 
-quota-exceeded:
-  switch-project: true
-  switch-preview-model: true
-
 routing:
   strategy: "round-robin"
 
-ws-auth: false
 nonstream-keepalive-interval: 0
 
 # Optional defaults for file-backed Codex OAuth accounts.
@@ -65,11 +55,3 @@ nonstream-keepalive-interval: 0
 # codex-header-defaults:
 #   user-agent: "codex_cli_rs/0.114.0 (Mac OS 14.2.0; x86_64) vscode/1.111.0"
 #   beta-features: "multi_agent"
-
-# Optional direct API-key entries if you also want to mix Codex API keys with
-# OAuth accounts in the same proxy.
-# codex-api-key:
-#   - api-key: "sk-..."
-#     models:
-#       - name: "gpt-5-codex"
-#         alias: "codex"

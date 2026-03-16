@@ -4,8 +4,8 @@ Codex-only proxy and management console.
 
 This branch intentionally removes every non-Codex product path from the product surface:
 
-- only Codex OAuth accounts and Codex API keys
-- only OpenAI-compatible `/v1/*` endpoints that route into Codex
+- only imported Codex OAuth accounts
+- only `/v1/models`, `/v1/responses`, `/v1/responses/compact`, and websocket `GET /v1/responses`
 - only the built-in Chinese management console at `/management.html`
 - only Codex account import, quota refresh, invalid-account cleanup, and usage statistics
 
@@ -15,7 +15,7 @@ CLIProxyAPI in this branch is a small self-hosted gateway for a Codex account po
 
 Typical use cases:
 
-- expose a single OpenAI-compatible endpoint for Codex clients
+- expose the minimal Codex-compatible HTTP surface for clients
 - import many `codex-*.json` OAuth account files
 - auto-refresh and prune invalid accounts
 - inspect request count, account health, and quota status from the web console
@@ -24,7 +24,7 @@ Typical use cases:
 
 1. Start the server directly, even if you do not have a `config.yaml` yet.
 2. The server will auto-create a bootstrap config file on first boot.
-3. Open `http://127.0.0.1:8317/management.html`.
+3. Open `http://127.0.0.1:8317/` and let it redirect to `/management.html`.
 4. Complete the first-time setup wizard in the browser:
    - set the management secret
    - set at least one downstream `api-keys` entry
@@ -39,7 +39,6 @@ The shipped [config.example.yaml](config.example.yaml) is already trimmed to the
 
 - `auth-dir`
 - `api-keys`
-- `codex-api-key` (optional)
 - retry / routing / management settings
 - optional Codex header defaults
 
@@ -64,6 +63,13 @@ Main operations:
 - refresh quota manually
 - clean invalid accounts
 - delete local account files
+
+Current API surface:
+
+- `GET /v1/models`
+- `POST /v1/responses`
+- `POST /v1/responses/compact`
+- `GET /v1/responses` for websocket upgrade requests
 
 ## Development
 

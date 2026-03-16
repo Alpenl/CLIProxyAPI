@@ -9,11 +9,6 @@ type SDKConfig struct {
 	// ProxyURL is the URL of an optional proxy server to use for outbound requests.
 	ProxyURL string `yaml:"proxy-url" json:"proxy-url"`
 
-	// ForceModelPrefix requires explicit model prefixes (e.g., "teamA/gpt-5-codex")
-	// to target prefixed credentials. When false, unprefixed model requests may use prefixed
-	// credentials as well.
-	ForceModelPrefix bool `yaml:"force-model-prefix" json:"force-model-prefix"`
-
 	// RequestLog enables or disables detailed request logging functionality.
 	RequestLog bool `yaml:"request-log" json:"request-log"`
 

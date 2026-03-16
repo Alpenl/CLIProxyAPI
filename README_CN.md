@@ -5,8 +5,7 @@ Codex 专用代理与管理控制台。
 这个分支已经刻意删除所有非 Codex 的产品路径，只保留：
 
 - Codex OAuth 账号
-- Codex API Key
-- 面向 Codex 的 OpenAI 兼容 `/v1/*` 接口
+- 仅保留 `/v1/models`、`/v1/responses`、`/v1/responses/compact` 和 websocket `GET /v1/responses`
 - 内嵌中文管理面板 `/management.html`
 - 账号导入、额度刷新、失效清理、用量统计
 
@@ -14,18 +13,18 @@ Codex 专用代理与管理控制台。
 
 这是一个面向 Codex 账号池的轻量代理：
 
-- 对外暴露单一 OpenAI 兼容接口
+- 对外暴露最小可用的 Codex 请求接口面
 - 管理多份 `codex-*.json` OAuth 账号文件
 - 自动刷新账号状态并清理失效账号
 - 在 Web 控制台中查看请求量、账号健康和额度状态
 
 ## 快速开始
 
-1. 复制 [config.example.yaml](config.example.yaml) 作为自己的配置文件。
-2. 设置 `remote-management.secret-key`。
-3. 至少配置一个下游 `api-keys`。
-4. 启动服务。
-5. 访问 `http://127.0.0.1:8317/management.html`。
+1. 直接启动程序，即使还没有 `config.yaml` 也可以。
+2. 首次启动会自动生成 bootstrap 配置。
+3. 打开 `http://127.0.0.1:8317/`，程序会自动跳转到 `/management.html`。
+4. 第一次进入时在网页里完成初始化，至少配置一个下游 `api-keys`。
+5. 初始化完成后用管理密钥登录后台。
 
 ## 当前支持的配置
 
@@ -33,7 +32,6 @@ Codex 专用代理与管理控制台。
 
 - `auth-dir`
 - `api-keys`
-- `codex-api-key`（可选）
 - 重试 / 路由 / 管理面板设置
 - 可选的 Codex Header 默认值
 
@@ -57,6 +55,13 @@ Codex 专用代理与管理控制台。
 - 手动刷新额度
 - 清理失效账号
 - 删除本地账号文件
+
+当前 API 面：
+
+- `GET /v1/models`
+- `POST /v1/responses`
+- `POST /v1/responses/compact`
+- websocket 升级使用 `GET /v1/responses`
 
 ## 开发验证
 

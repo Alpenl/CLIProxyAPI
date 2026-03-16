@@ -259,16 +259,13 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, configFilePath str
 // It defines the endpoints and associates them with their respective handlers.
 func (s *Server) setupRoutes() {
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
-	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
 	openaiResponsesHandlers := openai.NewOpenAIResponsesAPIHandler(s.handlers)
 
-	// OpenAI compatible API routes
+	// Codex-compatible API routes
 	v1 := s.engine.Group("/v1")
 	v1.Use(AuthMiddleware(s.requestAuth))
 	{
-		v1.GET("/models", openaiHandlers.OpenAIModels)
-		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
-		v1.POST("/completions", openaiHandlers.Completions)
+		v1.GET("/models", openaiResponsesHandlers.OpenAIResponsesModels)
 		v1.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
 		v1.POST("/responses", openaiResponsesHandlers.Responses)
 		v1.POST("/responses/compact", openaiResponsesHandlers.Compact)
@@ -325,7 +322,7 @@ func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
 
 func (s *Server) serveManagementControlPanel(c *gin.Context) {
 	cfg := s.cfg
-	if cfg == nil || cfg.RemoteManagement.DisableControlPanel {
+	if cfg == nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
@@ -578,13 +575,9 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		dirSetter.SetBaseDir(cfg.AuthDir)
 	}
 	authEntries := util.CountAuthFiles(context.Background(), tokenStore)
-	codexAPIKeyCount := len(cfg.CodexKey)
-
-	total := authEntries + codexAPIKeyCount
-	fmt.Printf("server clients and configuration updated: %d clients (%d auth entries + %d Codex keys)\n",
-		total,
+	fmt.Printf("server clients and configuration updated: %d clients (%d auth entries)\n",
 		authEntries,
-		codexAPIKeyCount,
+		authEntries,
 	)
 }
 

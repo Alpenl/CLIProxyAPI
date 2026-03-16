@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	internalconfig "github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/thinking"
@@ -140,14 +140,6 @@ type Manager struct {
 	maxRetryCredentials atomic.Int32
 	maxRetryInterval    atomic.Int64
 
-	// apiKeyModelAlias caches resolved model alias mappings for API-key auths.
-	// Keyed by auth.ID, value is alias(lower) -> upstream model (including suffix).
-	apiKeyModelAlias atomic.Value
-
-	// runtimeConfig stores the latest application config for request-time decisions.
-	// It is initialized in NewManager; never Load() before first Store().
-	runtimeConfig atomic.Value
-
 	// Optional HTTP RoundTripper source injected by host.
 	rtProvider RoundTripperProvider
 
@@ -171,9 +163,6 @@ func NewManager(store Store, selector Selector, hook Hook) *Manager {
 		auths:            make(map[string]*Auth),
 		refreshSemaphore: make(chan struct{}, refreshMaxConcurrency),
 	}
-	// atomic.Value requires non-nil initial value.
-	manager.runtimeConfig.Store(&internalconfig.Config{})
-	manager.apiKeyModelAlias.Store(apiKeyModelAliasTable(nil))
 	manager.scheduler = newAuthScheduler(selector)
 	return manager
 }
@@ -251,60 +240,9 @@ func (m *Manager) SetRoundTripperProvider(p RoundTripperProvider) {
 	m.mu.Unlock()
 }
 
-// SetConfig updates the runtime config snapshot used by request-time helpers.
-// Callers should provide the latest config on reload so per-credential alias mapping stays in sync.
-func (m *Manager) SetConfig(cfg *internalconfig.Config) {
-	if m == nil {
-		return
-	}
-	if cfg == nil {
-		cfg = &internalconfig.Config{}
-	}
-	m.runtimeConfig.Store(cfg)
-	m.rebuildAPIKeyModelAliasFromRuntimeConfig()
-}
-
-func (m *Manager) lookupAPIKeyUpstreamModel(authID, requestedModel string) string {
-	if m == nil {
-		return ""
-	}
-	authID = strings.TrimSpace(authID)
-	if authID == "" {
-		return ""
-	}
-	requestedModel = strings.TrimSpace(requestedModel)
-	if requestedModel == "" {
-		return ""
-	}
-	table, _ := m.apiKeyModelAlias.Load().(apiKeyModelAliasTable)
-	if table == nil {
-		return ""
-	}
-	byAlias := table[authID]
-	if len(byAlias) == 0 {
-		return ""
-	}
-	key := strings.ToLower(thinking.ParseSuffix(requestedModel).ModelName)
-	if key == "" {
-		key = strings.ToLower(requestedModel)
-	}
-	resolved := strings.TrimSpace(byAlias[key])
-	if resolved == "" {
-		return ""
-	}
-	return preserveRequestedModelSuffix(requestedModel, resolved)
-}
-
-func isAPIKeyAuth(auth *Auth) bool {
-	if auth == nil {
-		return false
-	}
-	kind, _ := auth.AccountInfo()
-	return strings.EqualFold(strings.TrimSpace(kind), "api_key")
-}
-
-func preserveRequestedModelSuffix(requestedModel, resolved string) string {
-	return preserveResolvedModelSuffix(resolved, thinking.ParseSuffix(requestedModel))
+// SetConfig is kept for host compatibility. The Codex-only runtime no longer
+// uses config-backed API-key alias mappings at request time.
+func (m *Manager) SetConfig(_ *internalconfig.Config) {
 }
 
 func (m *Manager) executionModelCandidates(auth *Auth, routeModel string) []string {
@@ -313,11 +251,7 @@ func (m *Manager) executionModelCandidates(auth *Auth, routeModel string) []stri
 
 func (m *Manager) prepareExecutionModels(auth *Auth, routeModel string) []string {
 	requestedModel := rewriteModelForAuth(routeModel, auth)
-	resolved := m.applyAPIKeyModelAlias(auth, requestedModel)
-	if strings.TrimSpace(resolved) == "" {
-		resolved = requestedModel
-	}
-	return []string{resolved}
+	return []string{requestedModel}
 }
 
 func discardStreamChunks(ch <-chan cliproxyexecutor.StreamChunk) {
@@ -502,101 +436,6 @@ func (m *Manager) executeStreamWithModelPool(ctx context.Context, executor Execu
 	return nil, lastErr
 }
 
-func (m *Manager) rebuildAPIKeyModelAliasFromRuntimeConfig() {
-	if m == nil {
-		return
-	}
-	cfg, _ := m.runtimeConfig.Load().(*internalconfig.Config)
-	if cfg == nil {
-		cfg = &internalconfig.Config{}
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.rebuildAPIKeyModelAliasLocked(cfg)
-}
-
-func (m *Manager) rebuildAPIKeyModelAliasLocked(cfg *internalconfig.Config) {
-	if m == nil {
-		return
-	}
-	if cfg == nil {
-		cfg = &internalconfig.Config{}
-	}
-
-	out := make(apiKeyModelAliasTable)
-	for _, auth := range m.auths {
-		if auth == nil {
-			continue
-		}
-		if strings.TrimSpace(auth.ID) == "" {
-			continue
-		}
-		kind, _ := auth.AccountInfo()
-		if !strings.EqualFold(strings.TrimSpace(kind), "api_key") {
-			continue
-		}
-
-		byAlias := make(map[string]string)
-		if strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
-			if entry := resolveCodexAPIKeyConfig(cfg, auth); entry != nil {
-				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
-			}
-		}
-
-		if len(byAlias) > 0 {
-			out[auth.ID] = byAlias
-		}
-	}
-
-	m.apiKeyModelAlias.Store(out)
-}
-
-func compileAPIKeyModelAliasForModels[T interface {
-	GetName() string
-	GetAlias() string
-}](out map[string]string, models []T) {
-	if out == nil {
-		return
-	}
-	for i := range models {
-		alias := strings.TrimSpace(models[i].GetAlias())
-		name := strings.TrimSpace(models[i].GetName())
-		if alias == "" || name == "" {
-			continue
-		}
-		aliasKey := strings.ToLower(thinking.ParseSuffix(alias).ModelName)
-		if aliasKey == "" {
-			aliasKey = strings.ToLower(alias)
-		}
-		// Config priority: first alias wins.
-		if _, exists := out[aliasKey]; exists {
-			continue
-		}
-		out[aliasKey] = name
-		// Also allow direct lookup by upstream name (case-insensitive), so lookups on already-upstream
-		// models remain a cheap no-op.
-		nameKey := strings.ToLower(thinking.ParseSuffix(name).ModelName)
-		if nameKey == "" {
-			nameKey = strings.ToLower(name)
-		}
-		if nameKey != "" {
-			if _, exists := out[nameKey]; !exists {
-				out[nameKey] = name
-			}
-		}
-		// Preserve config suffix priority by seeding a base-name lookup when name already has suffix.
-		nameResult := thinking.ParseSuffix(name)
-		if nameResult.HasSuffix {
-			baseKey := strings.ToLower(strings.TrimSpace(nameResult.ModelName))
-			if baseKey != "" {
-				if _, exists := out[baseKey]; !exists {
-					out[baseKey] = name
-				}
-			}
-		}
-	}
-}
-
 // SetRetryConfig updates retry attempts, credential retry limit and cooldown wait interval.
 func (m *Manager) SetRetryConfig(retry int, maxRetryInterval time.Duration, maxRetryCredentials int) {
 	if m == nil {
@@ -659,7 +498,6 @@ func (m *Manager) Register(ctx context.Context, auth *Auth) (*Auth, error) {
 	m.mu.Lock()
 	m.auths[auth.ID] = authClone
 	m.mu.Unlock()
-	m.rebuildAPIKeyModelAliasFromRuntimeConfig()
 	if m.scheduler != nil {
 		m.scheduler.upsertAuth(authClone)
 	}
@@ -687,7 +525,6 @@ func (m *Manager) Update(ctx context.Context, auth *Auth) (*Auth, error) {
 	authClone := auth.Clone()
 	m.auths[auth.ID] = authClone
 	m.mu.Unlock()
-	m.rebuildAPIKeyModelAliasFromRuntimeConfig()
 	if m.scheduler != nil {
 		m.scheduler.upsertAuth(authClone)
 	}
@@ -712,7 +549,6 @@ func (m *Manager) Remove(id string) {
 	delete(m.auths, id)
 	m.mu.Unlock()
 
-	m.rebuildAPIKeyModelAliasFromRuntimeConfig()
 	if m.scheduler != nil {
 		m.scheduler.removeAuth(id)
 	}
@@ -739,11 +575,6 @@ func (m *Manager) Load(ctx context.Context) error {
 		auth.EnsureIndex()
 		m.auths[auth.ID] = auth.Clone()
 	}
-	cfg, _ := m.runtimeConfig.Load().(*internalconfig.Config)
-	if cfg == nil {
-		cfg = &internalconfig.Config{}
-	}
-	m.rebuildAPIKeyModelAliasLocked(cfg)
 	m.mu.Unlock()
 	m.syncScheduler()
 	return nil
@@ -1049,117 +880,6 @@ func rewriteModelForAuth(model string, auth *Auth) string {
 		return model
 	}
 	return strings.TrimPrefix(model, needle)
-}
-
-func (m *Manager) applyAPIKeyModelAlias(auth *Auth, requestedModel string) string {
-	if m == nil || auth == nil {
-		return requestedModel
-	}
-
-	kind, _ := auth.AccountInfo()
-	if !strings.EqualFold(strings.TrimSpace(kind), "api_key") {
-		return requestedModel
-	}
-
-	requestedModel = strings.TrimSpace(requestedModel)
-	if requestedModel == "" {
-		return requestedModel
-	}
-
-	// Fast path: lookup per-auth mapping table (keyed by auth.ID).
-	if resolved := m.lookupAPIKeyUpstreamModel(auth.ID, requestedModel); resolved != "" {
-		return resolved
-	}
-
-	// Slow path: scan config for the matching credential entry and resolve alias.
-	// This acts as a safety net if mappings are stale or auth.ID is missing.
-	cfg, _ := m.runtimeConfig.Load().(*internalconfig.Config)
-	if cfg == nil {
-		cfg = &internalconfig.Config{}
-	}
-
-	if strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
-		if upstreamModel := resolveUpstreamModelForCodexAPIKey(cfg, auth, requestedModel); upstreamModel != "" {
-			return upstreamModel
-		}
-	}
-	return requestedModel
-}
-
-// APIKeyConfigEntry is a generic interface for API key configurations.
-type APIKeyConfigEntry interface {
-	GetAPIKey() string
-	GetBaseURL() string
-}
-
-func resolveAPIKeyConfig[T APIKeyConfigEntry](entries []T, auth *Auth) *T {
-	if auth == nil || len(entries) == 0 {
-		return nil
-	}
-	attrKey, attrBase := "", ""
-	if auth.Attributes != nil {
-		attrKey = strings.TrimSpace(auth.Attributes["api_key"])
-		attrBase = strings.TrimSpace(auth.Attributes["base_url"])
-	}
-	for i := range entries {
-		entry := &entries[i]
-		cfgKey := strings.TrimSpace((*entry).GetAPIKey())
-		cfgBase := strings.TrimSpace((*entry).GetBaseURL())
-		if attrKey != "" && attrBase != "" {
-			if strings.EqualFold(cfgKey, attrKey) && strings.EqualFold(cfgBase, attrBase) {
-				return entry
-			}
-			continue
-		}
-		if attrKey != "" && strings.EqualFold(cfgKey, attrKey) {
-			if cfgBase == "" || strings.EqualFold(cfgBase, attrBase) {
-				return entry
-			}
-		}
-		if attrKey == "" && attrBase != "" && strings.EqualFold(cfgBase, attrBase) {
-			return entry
-		}
-	}
-	if attrKey != "" {
-		for i := range entries {
-			entry := &entries[i]
-			if strings.EqualFold(strings.TrimSpace((*entry).GetAPIKey()), attrKey) {
-				return entry
-			}
-		}
-	}
-	return nil
-}
-
-func resolveCodexAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internalconfig.CodexKey {
-	if cfg == nil {
-		return nil
-	}
-	return resolveAPIKeyConfig(cfg.CodexKey, auth)
-}
-
-func resolveUpstreamModelForCodexAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
-	entry := resolveCodexAPIKeyConfig(cfg, auth)
-	if entry == nil {
-		return ""
-	}
-	return resolveModelAliasFromConfigModels(requestedModel, asModelAliasEntries(entry.Models))
-}
-
-type apiKeyModelAliasTable map[string]map[string]string
-
-func asModelAliasEntries[T interface {
-	GetName() string
-	GetAlias() string
-}](models []T) []modelAliasEntry {
-	if len(models) == 0 {
-		return nil
-	}
-	out := make([]modelAliasEntry, 0, len(models))
-	for i := range models {
-		out = append(out, models[i])
-	}
-	return out
 }
 
 func (m *Manager) retrySettings() (int, int, time.Duration) {

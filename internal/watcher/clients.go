@@ -34,9 +34,7 @@ func (w *Watcher) reloadClients(rescanAuth bool, forceAuthRefresh bool) {
 		return
 	}
 
-	codexAPIKeyCount := len(cfg.CodexKey)
-	totalAPIKeyClients := codexAPIKeyCount
-	log.Debugf("loaded %d API key clients", totalAPIKeyClients)
+	log.Debug("loaded 0 config-backed API key clients")
 
 	var authFileCount int
 	if rescanAuth {
@@ -91,7 +89,7 @@ func (w *Watcher) reloadClients(rescanAuth bool, forceAuthRefresh bool) {
 		w.clientsMutex.Unlock()
 	}
 
-	totalNewClients := authFileCount + codexAPIKeyCount
+	totalNewClients := authFileCount
 
 	if w.reloadCallback != nil {
 		log.Debugf("triggering server update callback before auth refresh")
@@ -100,10 +98,9 @@ func (w *Watcher) reloadClients(rescanAuth bool, forceAuthRefresh bool) {
 
 	w.refreshAuthState(forceAuthRefresh)
 
-	log.Infof("full client load complete - %d clients (%d auth files + %d Codex keys)",
+	log.Infof("full client load complete - %d clients (%d auth files)",
 		totalNewClients,
 		authFileCount,
-		codexAPIKeyCount,
 	)
 }
 
