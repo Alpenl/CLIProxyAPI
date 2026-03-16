@@ -7,20 +7,20 @@ import (
 
 func TestGetModelInfoReturnsClone(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "codex", []*ModelInfo{{
+	r.RegisterClient("client-1", []*ModelInfo{{
 		ID:          "m1",
 		DisplayName: "Model One",
 		Thinking:    &ThinkingSupport{Min: 1, Max: 2, Levels: []string{"low", "high"}},
 	}})
 
-	first := r.GetModelInfo("m1", "codex")
+	first := r.GetModelInfo("m1")
 	if first == nil {
 		t.Fatal("expected model info")
 	}
 	first.DisplayName = "mutated"
 	first.Thinking.Levels[0] = "mutated"
 
-	second := r.GetModelInfo("m1", "codex")
+	second := r.GetModelInfo("m1")
 	if second.DisplayName != "Model One" {
 		t.Fatalf("expected cloned display name, got %q", second.DisplayName)
 	}
@@ -31,7 +31,7 @@ func TestGetModelInfoReturnsClone(t *testing.T) {
 
 func TestGetModelsForClientReturnsClones(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "codex", []*ModelInfo{{
+	r.RegisterClient("client-1", []*ModelInfo{{
 		ID:          "m1",
 		DisplayName: "Model One",
 		Thinking:    &ThinkingSupport{Levels: []string{"low", "high"}},
@@ -56,22 +56,22 @@ func TestGetModelsForClientReturnsClones(t *testing.T) {
 	}
 }
 
-func TestGetAvailableModelsByProviderReturnsClones(t *testing.T) {
+func TestGetAvailableCodexModelsReturnsClones(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "codex", []*ModelInfo{{
+	r.RegisterClient("client-1", []*ModelInfo{{
 		ID:          "m1",
 		DisplayName: "Model One",
 		Thinking:    &ThinkingSupport{Levels: []string{"low", "high"}},
 	}})
 
-	first := r.GetAvailableModelsByProvider("codex")
+	first := r.GetAvailableCodexModels()
 	if len(first) != 1 || first[0] == nil {
 		t.Fatalf("expected one model, got %+v", first)
 	}
 	first[0].DisplayName = "mutated"
 	first[0].Thinking.Levels[0] = "mutated"
 
-	second := r.GetAvailableModelsByProvider("codex")
+	second := r.GetAvailableCodexModels()
 	if len(second) != 1 || second[0] == nil {
 		t.Fatalf("expected one model on second fetch, got %+v", second)
 	}
@@ -85,7 +85,7 @@ func TestGetAvailableModelsByProviderReturnsClones(t *testing.T) {
 
 func TestCleanupExpiredQuotasInvalidatesAvailableModelsCache(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "openai", []*ModelInfo{{ID: "m1", Created: 1}})
+	r.RegisterClient("client-1", []*ModelInfo{{ID: "m1", Created: 1}})
 	r.SetModelQuotaExceeded("client-1", "m1")
 	if models := r.GetAvailableModels("openai"); len(models) != 1 {
 		t.Fatalf("expected cooldown model to remain listed before cleanup, got %d", len(models))
@@ -112,7 +112,7 @@ func TestCleanupExpiredQuotasInvalidatesAvailableModelsCache(t *testing.T) {
 
 func TestGetAvailableModelsReturnsClonedSupportedParameters(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "openai", []*ModelInfo{{
+	r.RegisterClient("client-1", []*ModelInfo{{
 		ID:                  "m1",
 		DisplayName:         "Model One",
 		SupportedParameters: []string{"temperature", "top_p"},
@@ -152,7 +152,7 @@ func TestGetStaticModelDefinitionsByChannel_CodexOnly(t *testing.T) {
 	if models := GetStaticModelDefinitionsByChannel("codex"); len(models) == 0 {
 		t.Fatal("expected codex static models")
 	}
-	for _, channel := range []string{"gemini", "claude", "qwen", "iflow", "kimi", "antigravity", "vertex", "aistudio"} {
+	for _, channel := range []string{"other", "legacy", "openai"} {
 		if models := GetStaticModelDefinitionsByChannel(channel); models != nil {
 			t.Fatalf("expected no static models for %q, got %d", channel, len(models))
 		}

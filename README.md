@@ -38,7 +38,7 @@ The shipped [config.example.yaml](config.example.yaml) is already trimmed to the
 - retry / routing / management settings
 - optional Codex header defaults
 
-Legacy provider blocks are ignored on load and stripped on save.
+Unsupported config blocks are ignored on load.
 
 ## Management Console
 

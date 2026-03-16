@@ -28,16 +28,16 @@ func TestStableIDGenerator_Next(t *testing.T) {
 		wantPrefix string
 	}{
 		{
-			name:       "basic gemini apikey",
-			kind:       "gemini:apikey",
+			name:       "basic legacy apikey",
+			kind:       "legacy-a:apikey",
 			parts:      []string{"test-key", ""},
-			wantPrefix: "gemini:apikey:",
+			wantPrefix: "legacy-a:apikey:",
 		},
 		{
-			name:       "claude with base url",
-			kind:       "claude:apikey",
+			name:       "legacy provider with base url",
+			kind:       "legacy-b:apikey",
 			parts:      []string{"sk-ant-xxx", "https://api.anthropic.com"},
-			wantPrefix: "claude:apikey:",
+			wantPrefix: "legacy-b:apikey:",
 		},
 		{
 			name:       "empty parts",
@@ -69,8 +69,8 @@ func TestStableIDGenerator_Stability(t *testing.T) {
 	gen1 := NewStableIDGenerator()
 	gen2 := NewStableIDGenerator()
 
-	id1, _ := gen1.Next("gemini:apikey", "test-key", "https://api.example.com")
-	id2, _ := gen2.Next("gemini:apikey", "test-key", "https://api.example.com")
+	id1, _ := gen1.Next("legacy-a:apikey", "test-key", "https://api.example.com")
+	id2, _ := gen2.Next("legacy-a:apikey", "test-key", "https://api.example.com")
 
 	if id1 != id2 {
 		t.Errorf("same inputs should produce same ID: got %q and %q", id1, id2)
@@ -80,8 +80,8 @@ func TestStableIDGenerator_Stability(t *testing.T) {
 func TestStableIDGenerator_CollisionHandling(t *testing.T) {
 	gen := NewStableIDGenerator()
 
-	id1, short1 := gen.Next("gemini:apikey", "same-key")
-	id2, short2 := gen.Next("gemini:apikey", "same-key")
+	id1, short1 := gen.Next("legacy-a:apikey", "same-key")
+	id2, short2 := gen.Next("legacy-a:apikey", "same-key")
 
 	if id1 == id2 {
 		t.Error("collision should be handled with suffix")
@@ -119,7 +119,7 @@ func TestApplyAuthExcludedModelsMeta(t *testing.T) {
 		{
 			name: "apikey with excluded models",
 			auth: &coreauth.Auth{
-				Provider:   "gemini",
+				Provider:   "legacy-a",
 				Attributes: make(map[string]string),
 			},
 			cfg:      &config.Config{},
@@ -131,11 +131,11 @@ func TestApplyAuthExcludedModelsMeta(t *testing.T) {
 		{
 			name: "oauth with per-account excluded models",
 			auth: &coreauth.Auth{
-				Provider:   "claude",
+				Provider:   "legacy-b",
 				Attributes: make(map[string]string),
 			},
 			cfg:      &config.Config{},
-			perKey:   []string{"claude-2.0"},
+			perKey:   []string{"legacy-b-2.0"},
 			authKind: "oauth",
 			wantHash: true,
 			wantKind: "oauth",
@@ -154,7 +154,7 @@ func TestApplyAuthExcludedModelsMeta(t *testing.T) {
 		{
 			name: "nil attributes initialized",
 			auth: &coreauth.Auth{
-				Provider:   "gemini",
+				Provider:   "legacy-a",
 				Attributes: nil,
 			},
 			cfg:      &config.Config{},
@@ -166,7 +166,7 @@ func TestApplyAuthExcludedModelsMeta(t *testing.T) {
 		{
 			name: "apikey with duplicate excluded models",
 			auth: &coreauth.Auth{
-				Provider:   "gemini",
+				Provider:   "legacy-a",
 				Attributes: make(map[string]string),
 			},
 			cfg:      &config.Config{},
@@ -199,7 +199,7 @@ func TestApplyAuthExcludedModelsMeta(t *testing.T) {
 
 func TestApplyAuthExcludedModelsMeta_OAuthMergeWritesCombinedModels(t *testing.T) {
 	auth := &coreauth.Auth{
-		Provider:   "claude",
+		Provider:   "legacy-b",
 		Attributes: make(map[string]string),
 	}
 	cfg := &config.Config{}

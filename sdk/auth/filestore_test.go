@@ -11,12 +11,12 @@ func TestExtractAccessToken(t *testing.T) {
 		expected string
 	}{
 		{
-			"antigravity top-level access_token",
+			"top-level access_token",
 			map[string]any{"access_token": "tok-abc"},
 			"tok-abc",
 		},
 		{
-			"gemini nested token.access_token",
+			"nested token.access_token",
 			map[string]any{
 				"token": map[string]any{"access_token": "tok-nested"},
 			},

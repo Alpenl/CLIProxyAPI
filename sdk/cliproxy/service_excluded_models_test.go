@@ -29,7 +29,7 @@ func TestRegisterModelsForAuth_UsesPreMergedExcludedModelsAttribute(t *testing.T
 
 	service.registerModelsForAuth(auth)
 
-	models := registry.GetAvailableModelsByProvider("codex")
+	models := registry.GetAvailableCodexModels()
 	if len(models) == 0 {
 		t.Fatal("expected codex models to be registered")
 	}
@@ -49,8 +49,8 @@ func TestRegisterModelsForAuth_UsesPreMergedExcludedModelsAttribute(t *testing.T
 func TestRegisterModelsForAuth_IgnoresNonCodexProvider(t *testing.T) {
 	service := &Service{cfg: &config.Config{}}
 	auth := &coreauth.Auth{
-		ID:       "auth-gemini",
-		Provider: "gemini",
+		ID:       "auth-other",
+		Provider: "other",
 		Status:   coreauth.StatusActive,
 	}
 
@@ -62,7 +62,7 @@ func TestRegisterModelsForAuth_IgnoresNonCodexProvider(t *testing.T) {
 
 	service.registerModelsForAuth(auth)
 
-	if models := registry.GetAvailableModelsByProvider("gemini"); len(models) != 0 {
-		t.Fatalf("expected no gemini models to be registered, got %d", len(models))
+	if models := registry.GetModelsForClient(auth.ID); len(models) != 0 {
+		t.Fatalf("expected no models to be registered for non-codex auth, got %d", len(models))
 	}
 }

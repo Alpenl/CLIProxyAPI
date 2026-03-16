@@ -10,13 +10,14 @@ type ModelRegistryHook = registry.ModelRegistryHook
 
 // ModelRegistry describes registry operations consumed by external callers.
 type ModelRegistry interface {
-	RegisterClient(clientID, clientProvider string, models []*ModelInfo)
+	RegisterClient(clientID string, models []*ModelInfo)
 	UnregisterClient(clientID string)
 	SetModelQuotaExceeded(clientID, modelID string)
 	ClearModelQuotaExceeded(clientID, modelID string)
 	ClientSupportsModel(clientID, modelID string) bool
 	GetAvailableModels(handlerType string) []map[string]any
-	GetAvailableModelsByProvider(provider string) []*ModelInfo
+	GetAvailableCodexModels() []*ModelInfo
+	GetModelsForClient(clientID string) []*ModelInfo
 }
 
 // GlobalModelRegistry returns the shared registry instance.

@@ -58,7 +58,6 @@ func IsUserDefinedModel(modelInfo *registry.ModelInfo) bool {
 //   - model: Model name, optionally with thinking suffix (e.g., "gpt-5-codex(high)")
 //   - fromFormat: Source request format (e.g., openai, openai-response, codex)
 //   - toFormat: Target provider format for the request body (openai or codex)
-//   - providerKey: Provider identifier used for registry model lookups (may differ from toFormat in adapter layers)
 //
 // Returns:
 //   - Modified request body JSON with thinking configuration applied
@@ -75,16 +74,12 @@ func IsUserDefinedModel(modelInfo *registry.ModelInfo) bool {
 // Example:
 //
 //	// With suffix - suffix config takes priority
-//	result, err := thinking.ApplyThinking(body, "gpt-5-codex(high)", "openai-response", "codex", "codex")
+//	result, err := thinking.ApplyThinking(body, "gpt-5-codex(high)", "openai-response", "codex")
 //
 //	// Without suffix - uses body config
-//	result, err := thinking.ApplyThinking(body, "gpt-5", "openai", "openai", "openai")
-func ApplyThinking(body []byte, model string, fromFormat string, toFormat string, providerKey string) ([]byte, error) {
+//	result, err := thinking.ApplyThinking(body, "gpt-5", "openai", "openai")
+func ApplyThinking(body []byte, model string, fromFormat string, toFormat string) ([]byte, error) {
 	providerFormat := strings.ToLower(strings.TrimSpace(toFormat))
-	providerKey = strings.ToLower(strings.TrimSpace(providerKey))
-	if providerKey == "" {
-		providerKey = providerFormat
-	}
 	fromFormat = strings.ToLower(strings.TrimSpace(fromFormat))
 	if fromFormat == "" {
 		fromFormat = providerFormat
@@ -102,8 +97,7 @@ func ApplyThinking(body []byte, model string, fromFormat string, toFormat string
 	// 2. Parse suffix and get modelInfo
 	suffixResult := ParseSuffix(model)
 	baseModel := suffixResult.ModelName
-	// Use provider-specific lookup to handle capability differences across providers.
-	modelInfo := registry.LookupModelInfo(baseModel, providerKey)
+	modelInfo := registry.LookupModelInfo(baseModel)
 
 	// 3. Model capability check
 	// Unknown models are treated as user-defined so thinking config can still be applied.

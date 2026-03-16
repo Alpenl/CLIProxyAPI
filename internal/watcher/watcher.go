@@ -143,7 +143,7 @@ func (w *Watcher) SetAuthUpdateQueue(queue chan<- AuthUpdate) {
 	w.setAuthUpdateQueue(queue)
 }
 
-// DispatchRuntimeAuthUpdate allows external runtime providers (e.g., websocket-driven auths)
+// DispatchRuntimeAuthUpdate allows runtime-auth producers (for example websocket refresh flows)
 // to push auth updates through the same queue used by file/config watchers.
 // Returns true if the update was enqueued; false if no queue is configured.
 func (w *Watcher) DispatchRuntimeAuthUpdate(update AuthUpdate) bool {

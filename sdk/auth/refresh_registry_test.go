@@ -13,19 +13,7 @@ func TestRefreshRegistry_CodexOnlyProviders(t *testing.T) {
 		t.Fatal("expected codex refresh lead to be registered")
 	}
 
-	for _, provider := range []string{
-		"claude",
-		"qwen",
-		"iflow",
-		"gemini",
-		"gemini-cli",
-		"antigravity",
-		"kimi",
-		"vertex",
-		"openai-compatibility",
-	} {
-		if lead := cliproxyauth.ProviderRefreshLead(provider, nil); lead != nil {
-			t.Fatalf("expected provider %q to have no refresh lead, got %v", provider, *lead)
-		}
+	if lead := cliproxyauth.ProviderRefreshLead("other", nil); lead != nil {
+		t.Fatalf("expected unsupported provider to have no refresh lead, got %v", *lead)
 	}
 }

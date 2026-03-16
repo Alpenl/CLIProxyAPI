@@ -54,7 +54,7 @@ func TestApplyCodexPromptCacheHeadersIgnoresUnsupportedSourceFormat(t *testing.T
 		Payload: []byte(`{"metadata":{"user_id":"legacy-user"}}`),
 	}
 
-	body, headers := applyCodexPromptCacheHeaders(sdktranslator.Format("claude"), req, []byte(`{"model":"gpt-5-codex"}`))
+	body, headers := applyCodexPromptCacheHeaders(sdktranslator.Format("legacy"), req, []byte(`{"model":"gpt-5-codex"}`))
 
 	if promptCacheKey := gjson.GetBytes(body, "prompt_cache_key"); promptCacheKey.Exists() {
 		t.Fatalf("prompt_cache_key = %q, want no prompt cache key for unsupported source format", promptCacheKey.String())

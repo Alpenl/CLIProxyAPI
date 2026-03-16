@@ -58,7 +58,7 @@ func (w *WatcherWrapper) SetConfig(cfg *config.Config) {
 	w.setConfig(cfg)
 }
 
-// DispatchRuntimeAuthUpdate forwards runtime auth updates (e.g., websocket providers)
+// DispatchRuntimeAuthUpdate forwards runtime auth updates (for example websocket refreshes)
 // into the watcher-managed auth update queue when available.
 // Returns true if the update was enqueued successfully.
 func (w *WatcherWrapper) DispatchRuntimeAuthUpdate(update watcher.AuthUpdate) bool {

@@ -21,7 +21,7 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 
 	auth := &Auth{
 		ID:       "auth-1",
-		Provider: "claude",
+		Provider: "codex",
 		Metadata: map[string]any{
 			"request_retry": float64(0),
 		},
@@ -38,7 +38,7 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 	}
 
 	_, _, maxWait := m.retrySettings()
-	wait, shouldRetry := m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, "claude", model, maxWait)
+	wait, shouldRetry := m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, "codex", model, maxWait)
 	if shouldRetry {
 		t.Fatalf("expected shouldRetry=false for request_retry=0, got true (wait=%v)", wait)
 	}
@@ -48,7 +48,7 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 		t.Fatalf("update auth: %v", errUpdate)
 	}
 
-	wait, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, "claude", model, maxWait)
+	wait, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, "codex", model, maxWait)
 	if !shouldRetry {
 		t.Fatalf("expected shouldRetry=true for request_retry=1, got false")
 	}
@@ -56,7 +56,7 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 		t.Fatalf("expected wait > 0, got %v", wait)
 	}
 
-	_, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 1, "claude", model, maxWait)
+	_, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 1, "codex", model, maxWait)
 	if shouldRetry {
 		t.Fatalf("expected shouldRetry=false on attempt=1 for request_retry=1, got true")
 	}
@@ -114,17 +114,17 @@ func newCredentialRetryLimitTestManager(t *testing.T, maxRetryCredentials int) (
 	m := NewManager(nil, nil, nil)
 	m.SetRetryConfig(0, 0, maxRetryCredentials)
 
-	executor := &credentialRetryLimitExecutor{id: "claude"}
+	executor := &credentialRetryLimitExecutor{id: "codex"}
 	m.RegisterExecutor(executor)
 
 	baseID := uuid.NewString()
-	auth1 := &Auth{ID: baseID + "-auth-1", Provider: "claude"}
-	auth2 := &Auth{ID: baseID + "-auth-2", Provider: "claude"}
+	auth1 := &Auth{ID: baseID + "-auth-1", Provider: "codex"}
+	auth2 := &Auth{ID: baseID + "-auth-2", Provider: "codex"}
 
 	// Auth selection requires that the global model registry knows each credential supports the model.
 	reg := registry.GetGlobalRegistry()
-	reg.RegisterClient(auth1.ID, "claude", []*registry.ModelInfo{{ID: "test-model"}})
-	reg.RegisterClient(auth2.ID, "claude", []*registry.ModelInfo{{ID: "test-model"}})
+	reg.RegisterClient(auth1.ID, []*registry.ModelInfo{{ID: "test-model"}})
+	reg.RegisterClient(auth2.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		reg.UnregisterClient(auth1.ID)
 		reg.UnregisterClient(auth2.ID)
@@ -149,21 +149,21 @@ func TestManager_MaxRetryCredentials_LimitsCrossCredentialRetries(t *testing.T) 
 		{
 			name: "execute",
 			invoke: func(m *Manager) error {
-				_, errExecute := m.Execute(context.Background(), "claude", request, cliproxyexecutor.Options{})
+				_, errExecute := m.Execute(context.Background(), "codex", request, cliproxyexecutor.Options{})
 				return errExecute
 			},
 		},
 		{
 			name: "execute_count",
 			invoke: func(m *Manager) error {
-				_, errExecute := m.ExecuteCount(context.Background(), "claude", request, cliproxyexecutor.Options{})
+				_, errExecute := m.ExecuteCount(context.Background(), "codex", request, cliproxyexecutor.Options{})
 				return errExecute
 			},
 		},
 		{
 			name: "execute_stream",
 			invoke: func(m *Manager) error {
-				_, errExecute := m.ExecuteStream(context.Background(), "claude", request, cliproxyexecutor.Options{})
+				_, errExecute := m.ExecuteStream(context.Background(), "codex", request, cliproxyexecutor.Options{})
 				return errExecute
 			},
 		},
@@ -200,7 +200,7 @@ func TestManager_MarkResult_RespectsAuthDisableCoolingOverride(t *testing.T) {
 
 	auth := &Auth{
 		ID:       "auth-1",
-		Provider: "claude",
+		Provider: "codex",
 		Metadata: map[string]any{
 			"disable_cooling": true,
 		},
@@ -212,7 +212,7 @@ func TestManager_MarkResult_RespectsAuthDisableCoolingOverride(t *testing.T) {
 	model := "test-model"
 	m.MarkResult(context.Background(), Result{
 		AuthID:   "auth-1",
-		Provider: "claude",
+		Provider: "codex",
 		Model:    model,
 		Success:  false,
 		Error:    &Error{HTTPStatus: 500, Message: "boom"},

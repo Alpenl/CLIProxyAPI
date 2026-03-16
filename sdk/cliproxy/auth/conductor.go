@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	internalconfig "github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
@@ -2275,17 +2276,10 @@ func executorKeyFromAuth(auth *Auth) string {
 	if auth == nil {
 		return ""
 	}
-	if auth.Attributes != nil {
-		providerKey := strings.TrimSpace(auth.Attributes["provider_key"])
-		compatName := strings.TrimSpace(auth.Attributes["compat_name"])
-		if compatName != "" {
-			if providerKey == "" {
-				providerKey = compatName
-			}
-			return strings.ToLower(providerKey)
-		}
+	if !strings.EqualFold(strings.TrimSpace(auth.Provider), constant.Codex) {
+		return ""
 	}
-	return strings.ToLower(strings.TrimSpace(auth.Provider))
+	return constant.Codex
 }
 
 // logEntryWithRequestID returns a logrus entry with request_id field if available in context.

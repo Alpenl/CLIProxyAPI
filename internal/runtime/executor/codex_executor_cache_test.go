@@ -75,7 +75,7 @@ func TestCodexExecutorCacheHelperIgnoresUnsupportedSourceFormat(t *testing.T) {
 		Payload: []byte(`{"metadata":{"user_id":"legacy-user"}}`),
 	}
 
-	httpReq, err := executor.cacheHelper(ctx, sdktranslator.Format("claude"), "https://example.com/responses", req, rawJSON)
+	httpReq, err := executor.cacheHelper(ctx, sdktranslator.Format("legacy"), "https://example.com/responses", req, rawJSON)
 	if err != nil {
 		t.Fatalf("cacheHelper error: %v", err)
 	}

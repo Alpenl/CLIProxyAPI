@@ -13,7 +13,7 @@ func TestManager_Update_PreservesModelStates(t *testing.T) {
 
 	if _, errRegister := m.Register(context.Background(), &Auth{
 		ID:       "auth-1",
-		Provider: "claude",
+		Provider: "codex",
 		Metadata: map[string]any{"k": "v"},
 		ModelStates: map[string]*ModelState{
 			model: {
@@ -26,7 +26,7 @@ func TestManager_Update_PreservesModelStates(t *testing.T) {
 
 	if _, errUpdate := m.Update(context.Background(), &Auth{
 		ID:       "auth-1",
-		Provider: "claude",
+		Provider: "codex",
 		Metadata: map[string]any{"k": "v2"},
 	}); errUpdate != nil {
 		t.Fatalf("update auth: %v", errUpdate)

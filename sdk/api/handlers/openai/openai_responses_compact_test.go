@@ -57,7 +57,7 @@ func TestOpenAIResponsesCompactRejectsStream(t *testing.T) {
 	if _, err := manager.Register(context.Background(), auth); err != nil {
 		t.Fatalf("Register auth: %v", err)
 	}
-	registry.GetGlobalRegistry().RegisterClient(auth.ID, auth.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth.ID)
 	})
@@ -90,7 +90,7 @@ func TestOpenAIResponsesCompactExecute(t *testing.T) {
 	if _, err := manager.Register(context.Background(), auth); err != nil {
 		t.Fatalf("Register auth: %v", err)
 	}
-	registry.GetGlobalRegistry().RegisterClient(auth.ID, auth.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth.ID)
 	})

@@ -8,27 +8,27 @@ import (
 func TestExtractThinkingConfigIgnoresRemovedProviders(t *testing.T) {
 	t.Parallel()
 
-	geminiBody := []byte(`{"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`)
-	if got := extractThinkingConfig(geminiBody, "gemini"); hasThinkingConfig(got) {
-		t.Fatalf("extractThinkingConfig(gemini) = %+v, want empty config", got)
+	legacyBudgetBody := []byte(`{"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`)
+	if got := extractThinkingConfig(legacyBudgetBody, "legacy-a"); hasThinkingConfig(got) {
+		t.Fatalf("extractThinkingConfig(legacy-a) = %+v, want empty config", got)
 	}
 
-	claudeBody := []byte(`{"thinking":{"type":"enabled","budget_tokens":1024}}`)
-	if got := extractThinkingConfig(claudeBody, "claude"); hasThinkingConfig(got) {
-		t.Fatalf("extractThinkingConfig(claude) = %+v, want empty config", got)
+	legacyTokenBody := []byte(`{"thinking":{"type":"enabled","budget_tokens":1024}}`)
+	if got := extractThinkingConfig(legacyTokenBody, "legacy-b"); hasThinkingConfig(got) {
+		t.Fatalf("extractThinkingConfig(legacy-b) = %+v, want empty config", got)
 	}
 }
 
 func TestStripThinkingConfigIgnoresRemovedProviders(t *testing.T) {
 	t.Parallel()
 
-	geminiBody := []byte(`{"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`)
-	if got := StripThinkingConfig(geminiBody, "gemini"); !bytes.Equal(got, geminiBody) {
-		t.Fatalf("StripThinkingConfig(gemini) changed body to %s", got)
+	legacyBudgetBody := []byte(`{"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`)
+	if got := StripThinkingConfig(legacyBudgetBody, "legacy-a"); !bytes.Equal(got, legacyBudgetBody) {
+		t.Fatalf("StripThinkingConfig(legacy-a) changed body to %s", got)
 	}
 
-	claudeBody := []byte(`{"thinking":{"type":"disabled"},"output_config":{"effort":"high"}}`)
-	if got := StripThinkingConfig(claudeBody, "claude"); !bytes.Equal(got, claudeBody) {
-		t.Fatalf("StripThinkingConfig(claude) changed body to %s", got)
+	legacyTokenBody := []byte(`{"thinking":{"type":"disabled"},"output_config":{"effort":"high"}}`)
+	if got := StripThinkingConfig(legacyTokenBody, "legacy-b"); !bytes.Equal(got, legacyTokenBody) {
+		t.Fatalf("StripThinkingConfig(legacy-b) changed body to %s", got)
 	}
 }

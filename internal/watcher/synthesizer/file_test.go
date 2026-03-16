@@ -63,13 +63,13 @@ func TestFileSynthesizer_Synthesize_CodexFile(t *testing.T) {
 func TestFileSynthesizer_Synthesize_CodexOnlyIgnoresNonCodexAuthFiles(t *testing.T) {
 	authDir := t.TempDir()
 	files := map[string]map[string]any{
-		"claude-auth.json": {
-			"type":  "claude",
-			"email": "claude@example.com",
+		"legacy-a-auth.json": {
+			"type":  "legacy-a",
+			"email": "legacy-a@example.com",
 		},
-		"gemini-auth.json": {
-			"type":  "gemini",
-			"email": "gemini@example.com",
+		"legacy-b-auth.json": {
+			"type":  "legacy-b",
+			"email": "legacy-b@example.com",
 		},
 		"codex-auth.json": {
 			"type":  "codex",

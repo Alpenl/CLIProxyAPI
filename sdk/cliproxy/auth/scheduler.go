@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 )
@@ -32,15 +33,13 @@ const (
 
 // authScheduler keeps the incremental provider/model scheduling state used by Manager.
 type authScheduler struct {
-	mu            sync.Mutex
-	strategy      schedulerStrategy
-	providers     map[string]*providerScheduler
-	authProviders map[string]string
+	mu       sync.Mutex
+	strategy schedulerStrategy
+	state    *providerScheduler
 }
 
-// providerScheduler stores auth metadata and model shards for a single provider.
+// providerScheduler stores auth metadata and model shards for the Codex pool.
 type providerScheduler struct {
-	providerKey string
 	auths       map[string]*scheduledAuthMeta
 	modelShards map[string]*modelScheduler
 }
@@ -48,7 +47,6 @@ type providerScheduler struct {
 // scheduledAuthMeta stores the immutable scheduling fields derived from an auth snapshot.
 type scheduledAuthMeta struct {
 	auth              *Auth
-	providerKey       string
 	priority          int
 	websocketEnabled  bool
 	supportedModelSet map[string]struct{}
@@ -89,9 +87,11 @@ type cooldownQueue []*scheduledAuth
 // newAuthScheduler constructs an empty scheduler configured for the supplied selector strategy.
 func newAuthScheduler(selector Selector) *authScheduler {
 	return &authScheduler{
-		strategy:      selectorStrategy(selector),
-		providers:     make(map[string]*providerScheduler),
-		authProviders: make(map[string]string),
+		strategy: selectorStrategy(selector),
+		state: &providerScheduler{
+			auths:       make(map[string]*scheduledAuthMeta),
+			modelShards: make(map[string]*modelScheduler),
+		},
 	}
 }
 
@@ -124,8 +124,10 @@ func (s *authScheduler) rebuild(auths []*Auth) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.providers = make(map[string]*providerScheduler)
-	s.authProviders = make(map[string]string)
+	s.state = &providerScheduler{
+		auths:       make(map[string]*scheduledAuthMeta),
+		modelShards: make(map[string]*modelScheduler),
+	}
 	now := time.Now()
 	for _, auth := range auths {
 		s.upsertAuthLocked(auth, now)
@@ -162,13 +164,19 @@ func (s *authScheduler) pickSingle(ctx context.Context, provider, model string, 
 		return nil, &Error{Code: "auth_not_found", Message: "no auth available"}
 	}
 	providerKey := strings.ToLower(strings.TrimSpace(provider))
+	if providerKey == "" {
+		providerKey = constant.Codex
+	}
+	if providerKey != constant.Codex {
+		return nil, &Error{Code: "auth_not_found", Message: "no auth available"}
+	}
 	modelKey := canonicalModelKey(model)
 	pinnedAuthID := pinnedAuthIDFromMetadata(opts.Metadata)
-	preferWebsocket := cliproxyexecutor.DownstreamWebsocket(ctx) && providerKey == "codex" && pinnedAuthID == ""
+	preferWebsocket := cliproxyexecutor.DownstreamWebsocket(ctx) && pinnedAuthID == ""
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	providerState := s.providers[providerKey]
+	providerState := s.ensureStateLocked()
 	if providerState == nil {
 		return nil, &Error{Code: "auth_not_found", Message: "no auth available"}
 	}
@@ -217,18 +225,16 @@ func (s *authScheduler) upsertAuthLocked(auth *Auth, now time.Time) {
 	}
 	authID := strings.TrimSpace(auth.ID)
 	providerKey := strings.ToLower(strings.TrimSpace(auth.Provider))
-	if authID == "" || providerKey == "" || auth.Disabled {
+	if authID == "" || providerKey != constant.Codex || auth.Disabled {
 		s.removeAuthLocked(authID)
 		return
 	}
-	if previousProvider := s.authProviders[authID]; previousProvider != "" && previousProvider != providerKey {
-		if previousState := s.providers[previousProvider]; previousState != nil {
-			previousState.removeAuthLocked(authID)
-		}
-	}
 	meta := buildScheduledAuthMeta(auth)
-	s.authProviders[authID] = providerKey
-	s.ensureProviderLocked(providerKey).upsertAuthLocked(meta, now)
+	if meta == nil {
+		s.removeAuthLocked(authID)
+		return
+	}
+	s.ensureStateLocked().upsertAuthLocked(meta, now)
 }
 
 // removeAuthLocked removes one auth from the scheduler while the scheduler mutex is held.
@@ -236,37 +242,29 @@ func (s *authScheduler) removeAuthLocked(authID string) {
 	if authID == "" {
 		return
 	}
-	if providerKey := s.authProviders[authID]; providerKey != "" {
-		if providerState := s.providers[providerKey]; providerState != nil {
-			providerState.removeAuthLocked(authID)
-		}
-		delete(s.authProviders, authID)
+	if s.state != nil {
+		s.state.removeAuthLocked(authID)
 	}
 }
 
-// ensureProviderLocked returns the provider scheduler for providerKey, creating it when needed.
-func (s *authScheduler) ensureProviderLocked(providerKey string) *providerScheduler {
-	if s.providers == nil {
-		s.providers = make(map[string]*providerScheduler)
-	}
-	providerState := s.providers[providerKey]
-	if providerState == nil {
-		providerState = &providerScheduler{
-			providerKey: providerKey,
+// ensureStateLocked returns the Codex scheduler state, creating it on demand.
+func (s *authScheduler) ensureStateLocked() *providerScheduler {
+	if s.state == nil {
+		s.state = &providerScheduler{
 			auths:       make(map[string]*scheduledAuthMeta),
 			modelShards: make(map[string]*modelScheduler),
 		}
-		s.providers[providerKey] = providerState
 	}
-	return providerState
+	return s.state
 }
 
 // buildScheduledAuthMeta extracts the scheduling metadata needed for shard bookkeeping.
 func buildScheduledAuthMeta(auth *Auth) *scheduledAuthMeta {
-	providerKey := strings.ToLower(strings.TrimSpace(auth.Provider))
+	if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), constant.Codex) {
+		return nil
+	}
 	return &scheduledAuthMeta{
 		auth:              auth,
-		providerKey:       providerKey,
 		priority:          authPriority(auth),
 		websocketEnabled:  authWebsocketsEnabled(auth),
 		supportedModelSet: supportedModelSetForAuth(auth.ID),

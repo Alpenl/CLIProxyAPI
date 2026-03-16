@@ -57,7 +57,7 @@ func benchmarkManagerSetup(b *testing.B, total int, withPriority bool) (*Manager
 		if errRegister != nil {
 			b.Fatalf("Register(%s) error = %v", auth.ID, errRegister)
 		}
-		reg.RegisterClient(auth.ID, provider, []*registry.ModelInfo{{ID: model}})
+		reg.RegisterClient(auth.ID, []*registry.ModelInfo{{ID: model}})
 	}
 	manager.syncScheduler()
 	b.Cleanup(func() {

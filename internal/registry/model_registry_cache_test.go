@@ -4,7 +4,7 @@ import "testing"
 
 func TestGetAvailableModelsReturnsClonedSnapshots(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "OpenAI", []*ModelInfo{{ID: "m1", OwnedBy: "team-a", DisplayName: "Model One"}})
+	r.RegisterClient("client-1", []*ModelInfo{{ID: "m1", OwnedBy: "team-a", DisplayName: "Model One"}})
 
 	first := r.GetAvailableModels("openai")
 	if len(first) != 1 {
@@ -24,7 +24,7 @@ func TestGetAvailableModelsReturnsClonedSnapshots(t *testing.T) {
 
 func TestGetAvailableModelsInvalidatesCacheOnRegistryChanges(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("client-1", "OpenAI", []*ModelInfo{{ID: "m1", OwnedBy: "team-a", DisplayName: "Model One"}})
+	r.RegisterClient("client-1", []*ModelInfo{{ID: "m1", OwnedBy: "team-a", DisplayName: "Model One"}})
 
 	models := r.GetAvailableModels("openai")
 	if len(models) != 1 {
@@ -34,7 +34,7 @@ func TestGetAvailableModelsInvalidatesCacheOnRegistryChanges(t *testing.T) {
 		t.Fatalf("expected initial display_name Model One, got %v", got)
 	}
 
-	r.RegisterClient("client-1", "OpenAI", []*ModelInfo{{ID: "m1", OwnedBy: "team-a", DisplayName: "Model One Updated"}})
+	r.RegisterClient("client-1", []*ModelInfo{{ID: "m1", OwnedBy: "team-a", DisplayName: "Model One Updated"}})
 	models = r.GetAvailableModels("openai")
 	if got := models[0]["display_name"]; got != "Model One Updated" {
 		t.Fatalf("expected updated display_name after cache invalidation, got %v", got)

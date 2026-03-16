@@ -7,18 +7,8 @@ import (
 )
 
 func init() {
-	registerRefreshLead("codex", func() Authenticator { return NewCodexAuthenticator() })
-}
-
-func registerRefreshLead(provider string, factory func() Authenticator) {
-	cliproxyauth.RegisterRefreshLeadProvider(provider, func() *time.Duration {
-		if factory == nil {
-			return nil
-		}
-		auth := factory()
-		if auth == nil {
-			return nil
-		}
+	cliproxyauth.RegisterRefreshLeadProvider("codex", func() *time.Duration {
+		auth := NewCodexAuthenticator()
 		return auth.RefreshLead()
 	})
 }

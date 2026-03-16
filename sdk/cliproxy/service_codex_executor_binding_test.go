@@ -69,14 +69,14 @@ func TestEnsureExecutorsForAuth_IgnoresNonCodexProvider(t *testing.T) {
 		coreManager: coreauth.NewManager(nil, nil, nil),
 	}
 	auth := &coreauth.Auth{
-		ID:       "gemini-auth-1",
-		Provider: "gemini",
+		ID:       "other-auth-1",
+		Provider: "other",
 		Status:   coreauth.StatusActive,
 	}
 
 	service.ensureExecutorsForAuth(auth)
 
-	if _, ok := service.coreManager.Executor("gemini"); ok {
+	if _, ok := service.coreManager.Executor("other"); ok {
 		t.Fatal("expected non-codex provider executor to remain unregistered")
 	}
 	if _, ok := service.coreManager.Executor("codex"); ok {

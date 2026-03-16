@@ -14,19 +14,19 @@ port: 8317
 codex-api-key:
   - api-key: "codex-key"
     base-url: "https://codex.example.com"
-gemini-api-key:
-  - api-key: "gemini-key"
-claude-api-key:
-  - api-key: "claude-key"
-openai-compatibility:
+legacy-provider-a:
+  - api-key: "legacy-key-a"
+legacy-provider-b:
+  - api-key: "legacy-key-b"
+legacy-provider-c:
   - name: "router"
     base-url: "https://router.example.com"
     api-key-entries:
       - api-key: "compat-key"
-vertex-api-key:
-  - api-key: "vertex-key"
-ampcode:
-  upstream-url: "https://amp.example.com"
+legacy-provider-d:
+  - api-key: "legacy-key-d"
+legacy-provider-e:
+  upstream-url: "https://legacy.example.com"
 `
 	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)

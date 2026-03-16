@@ -80,9 +80,9 @@ func TestCodexManagementListAccounts_FiltersNonCodexProviders(t *testing.T) {
 	handler, _, authDir := newCodexManagementTestHandler(t)
 
 	codexPath := writeAuthJSONFile(t, authDir, "codex-alpha.json", `{"type":"codex","email":"alpha@example.com","refresh_token":"refresh-alpha"}`)
-	geminiPath := writeAuthJSONFile(t, authDir, "gemini-beta.json", `{"type":"gemini","email":"beta@example.com"}`)
+	otherPath := writeAuthJSONFile(t, authDir, "other-beta.json", `{"type":"other","email":"beta@example.com"}`)
 	registerAuthFile(t, handler, codexPath)
-	registerAuthFile(t, handler, geminiPath)
+	registerAuthFile(t, handler, otherPath)
 
 	router := newCodexManagementRouter(handler)
 	req := httptest.NewRequest(http.MethodGet, "/v0/management/codex/accounts", nil)
@@ -115,7 +115,7 @@ func TestCodexManagementImportDirectory_ImportsValidCodexFiles(t *testing.T) {
 
 	sourceDir := t.TempDir()
 	writeAuthJSONFile(t, sourceDir, "codex-first.json", `{"type":"codex","email":"first@example.com","refresh_token":"refresh-first","access_token":"access-first"}`)
-	writeAuthJSONFile(t, sourceDir, "gemini-second.json", `{"type":"gemini","email":"second@example.com"}`)
+	writeAuthJSONFile(t, sourceDir, "other-second.json", `{"type":"other","email":"second@example.com"}`)
 	writeAuthJSONFile(t, sourceDir, "broken.json", `{`)
 
 	router := newCodexManagementRouter(handler)

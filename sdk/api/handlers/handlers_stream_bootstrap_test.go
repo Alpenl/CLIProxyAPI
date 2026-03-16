@@ -260,8 +260,8 @@ func TestExecuteStreamWithAuthManager_RetriesBeforeFirstByte(t *testing.T) {
 		t.Fatalf("manager.Register(auth2): %v", err)
 	}
 
-	registry.GetGlobalRegistry().RegisterClient(auth1.ID, auth1.Provider, []*registry.ModelInfo{{ID: "test-model"}})
-	registry.GetGlobalRegistry().RegisterClient(auth2.ID, auth2.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth1.ID, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth2.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth1.ID)
 		registry.GetGlobalRegistry().UnregisterClient(auth2.ID)
@@ -326,8 +326,8 @@ func TestExecuteStreamWithAuthManager_HeaderPassthroughDisabledByDefault(t *test
 		t.Fatalf("manager.Register(auth2): %v", err)
 	}
 
-	registry.GetGlobalRegistry().RegisterClient(auth1.ID, auth1.Provider, []*registry.ModelInfo{{ID: "test-model"}})
-	registry.GetGlobalRegistry().RegisterClient(auth2.ID, auth2.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth1.ID, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth2.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth1.ID)
 		registry.GetGlobalRegistry().UnregisterClient(auth2.ID)
@@ -386,8 +386,8 @@ func TestExecuteStreamWithAuthManager_DoesNotRetryAfterFirstByte(t *testing.T) {
 		t.Fatalf("manager.Register(auth2): %v", err)
 	}
 
-	registry.GetGlobalRegistry().RegisterClient(auth1.ID, auth1.Provider, []*registry.ModelInfo{{ID: "test-model"}})
-	registry.GetGlobalRegistry().RegisterClient(auth2.ID, auth2.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth1.ID, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth2.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth1.ID)
 		registry.GetGlobalRegistry().UnregisterClient(auth2.ID)
@@ -456,8 +456,8 @@ func TestExecuteStreamWithAuthManager_PinnedAuthKeepsSameUpstream(t *testing.T) 
 		t.Fatalf("manager.Register(auth2): %v", err)
 	}
 
-	registry.GetGlobalRegistry().RegisterClient(auth1.ID, auth1.Provider, []*registry.ModelInfo{{ID: "test-model"}})
-	registry.GetGlobalRegistry().RegisterClient(auth2.ID, auth2.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth1.ID, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth2.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth1.ID)
 		registry.GetGlobalRegistry().UnregisterClient(auth2.ID)
@@ -518,7 +518,7 @@ func TestExecuteStreamWithAuthManager_SelectedAuthCallbackReceivesAuthID(t *test
 		t.Fatalf("manager.Register(auth2): %v", err)
 	}
 
-	registry.GetGlobalRegistry().RegisterClient(auth2.ID, auth2.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth2.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth2.ID)
 	})
@@ -571,7 +571,7 @@ func TestExecuteStreamWithAuthManager_ValidatesOpenAIResponsesStreamDataJSON(t *
 		t.Fatalf("manager.Register(auth1): %v", err)
 	}
 
-	registry.GetGlobalRegistry().RegisterClient(auth1.ID, auth1.Provider, []*registry.ModelInfo{{ID: "test-model"}})
+	registry.GetGlobalRegistry().RegisterClient(auth1.ID, []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		registry.GetGlobalRegistry().UnregisterClient(auth1.ID)
 	})

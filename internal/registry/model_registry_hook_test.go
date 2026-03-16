@@ -12,19 +12,16 @@ func newTestModelRegistry() *ModelRegistry {
 		models:           make(map[string]*ModelRegistration),
 		clientModels:     make(map[string][]string),
 		clientModelInfos: make(map[string]map[string]*ModelInfo),
-		clientProviders:  make(map[string]string),
 		mutex:            &sync.RWMutex{},
 	}
 }
 
 type registeredCall struct {
-	provider string
 	clientID string
 	models   []*ModelInfo
 }
 
 type unregisteredCall struct {
-	provider string
 	clientID string
 }
 
@@ -33,12 +30,12 @@ type capturingHook struct {
 	unregisteredCh chan unregisteredCall
 }
 
-func (h *capturingHook) OnModelsRegistered(ctx context.Context, provider, clientID string, models []*ModelInfo) {
-	h.registeredCh <- registeredCall{provider: provider, clientID: clientID, models: models}
+func (h *capturingHook) OnModelsRegistered(ctx context.Context, clientID string, models []*ModelInfo) {
+	h.registeredCh <- registeredCall{clientID: clientID, models: models}
 }
 
-func (h *capturingHook) OnModelsUnregistered(ctx context.Context, provider, clientID string) {
-	h.unregisteredCh <- unregisteredCall{provider: provider, clientID: clientID}
+func (h *capturingHook) OnModelsUnregistered(ctx context.Context, clientID string) {
+	h.unregisteredCh <- unregisteredCall{clientID: clientID}
 }
 
 func TestModelRegistryHook_OnModelsRegisteredCalled(t *testing.T) {
@@ -53,13 +50,10 @@ func TestModelRegistryHook_OnModelsRegisteredCalled(t *testing.T) {
 		{ID: "m1", DisplayName: "Model One"},
 		{ID: "m2", DisplayName: "Model Two"},
 	}
-	r.RegisterClient("client-1", "OpenAI", inputModels)
+	r.RegisterClient("client-1", inputModels)
 
 	select {
 	case call := <-hook.registeredCh:
-		if call.provider != "openai" {
-			t.Fatalf("provider mismatch: got %q, want %q", call.provider, "openai")
-		}
 		if call.clientID != "client-1" {
 			t.Fatalf("clientID mismatch: got %q, want %q", call.clientID, "client-1")
 		}
@@ -85,7 +79,7 @@ func TestModelRegistryHook_OnModelsUnregisteredCalled(t *testing.T) {
 	}
 	r.SetHook(hook)
 
-	r.RegisterClient("client-1", "OpenAI", []*ModelInfo{{ID: "m1"}})
+	r.RegisterClient("client-1", []*ModelInfo{{ID: "m1"}})
 	select {
 	case <-hook.registeredCh:
 	case <-time.After(2 * time.Second):
@@ -96,9 +90,6 @@ func TestModelRegistryHook_OnModelsUnregisteredCalled(t *testing.T) {
 
 	select {
 	case call := <-hook.unregisteredCh:
-		if call.provider != "openai" {
-			t.Fatalf("provider mismatch: got %q, want %q", call.provider, "openai")
-		}
 		if call.clientID != "client-1" {
 			t.Fatalf("clientID mismatch: got %q, want %q", call.clientID, "client-1")
 		}
@@ -112,7 +103,7 @@ type blockingHook struct {
 	unblock chan struct{}
 }
 
-func (h *blockingHook) OnModelsRegistered(ctx context.Context, provider, clientID string, models []*ModelInfo) {
+func (h *blockingHook) OnModelsRegistered(ctx context.Context, clientID string, models []*ModelInfo) {
 	select {
 	case <-h.started:
 	default:
@@ -121,7 +112,7 @@ func (h *blockingHook) OnModelsRegistered(ctx context.Context, provider, clientI
 	<-h.unblock
 }
 
-func (h *blockingHook) OnModelsUnregistered(ctx context.Context, provider, clientID string) {}
+func (h *blockingHook) OnModelsUnregistered(ctx context.Context, clientID string) {}
 
 func TestModelRegistryHook_DoesNotBlockRegisterClient(t *testing.T) {
 	r := newTestModelRegistry()
@@ -134,7 +125,7 @@ func TestModelRegistryHook_DoesNotBlockRegisterClient(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		r.RegisterClient("client-1", "OpenAI", []*ModelInfo{{ID: "m1"}})
+		r.RegisterClient("client-1", []*ModelInfo{{ID: "m1"}})
 		close(done)
 	}()
 
@@ -160,14 +151,14 @@ type panicHook struct {
 	unregisteredCalled chan struct{}
 }
 
-func (h *panicHook) OnModelsRegistered(ctx context.Context, provider, clientID string, models []*ModelInfo) {
+func (h *panicHook) OnModelsRegistered(ctx context.Context, clientID string, models []*ModelInfo) {
 	if h.registeredCalled != nil {
 		h.registeredCalled <- struct{}{}
 	}
 	panic("boom")
 }
 
-func (h *panicHook) OnModelsUnregistered(ctx context.Context, provider, clientID string) {
+func (h *panicHook) OnModelsUnregistered(ctx context.Context, clientID string) {
 	if h.unregisteredCalled != nil {
 		h.unregisteredCalled <- struct{}{}
 	}
@@ -182,7 +173,7 @@ func TestModelRegistryHook_PanicDoesNotAffectRegistry(t *testing.T) {
 	}
 	r.SetHook(hook)
 
-	r.RegisterClient("client-1", "OpenAI", []*ModelInfo{{ID: "m1"}})
+	r.RegisterClient("client-1", []*ModelInfo{{ID: "m1"}})
 
 	select {
 	case <-hook.registeredCalled:

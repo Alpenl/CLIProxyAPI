@@ -84,7 +84,7 @@ func (s *Service) RegisterUsagePlugin(plugin usage.Plugin) {
 	usage.RegisterPlugin(plugin)
 }
 
-// newDefaultAuthManager creates a default authentication manager with all supported providers.
+// newDefaultAuthManager creates the default auth manager for Codex token flows.
 func newDefaultAuthManager() *sdkAuth.Manager {
 	return sdkAuth.NewManager(
 		sdkAuth.GetTokenStore(),
@@ -281,7 +281,7 @@ func (s *Service) ensureExecutorsForAuthWithMode(a *coreauth.Auth, forceReplace 
 	s.coreManager.RegisterExecutor(executor.NewCodexAutoExecutor(s.cfg))
 }
 
-func (s *Service) registerResolvedModelsForAuth(a *coreauth.Auth, providerKey string, models []*ModelInfo) {
+func (s *Service) registerResolvedModelsForAuth(a *coreauth.Auth, models []*ModelInfo) {
 	if a == nil || a.ID == "" {
 		return
 	}
@@ -289,7 +289,7 @@ func (s *Service) registerResolvedModelsForAuth(a *coreauth.Auth, providerKey st
 		GlobalModelRegistry().UnregisterClient(a.ID)
 		return
 	}
-	GlobalModelRegistry().RegisterClient(a.ID, providerKey, models)
+	GlobalModelRegistry().RegisterClient(a.ID, models)
 }
 
 // rebindExecutors refreshes provider executors so they observe the latest configuration.
@@ -574,7 +574,7 @@ func (s *Service) ensureAuthDir() error {
 	return nil
 }
 
-// registerModelsForAuth (re)binds provider models in the global registry using the core auth ID as client identifier.
+// registerModelsForAuth (re)binds Codex models in the global registry using the core auth ID as client identifier.
 func (s *Service) registerModelsForAuth(a *coreauth.Auth) {
 	if a == nil || a.ID == "" {
 		return
@@ -636,11 +636,7 @@ func (s *Service) registerModelsForAuth(a *coreauth.Auth) {
 	}
 	models = applyExcludedModels(models, excluded)
 	if len(models) > 0 {
-		key := provider
-		if key == "" {
-			key = strings.ToLower(strings.TrimSpace(a.Provider))
-		}
-		s.registerResolvedModelsForAuth(a, key, applyModelPrefixes(models, a.Prefix, s.cfg != nil && s.cfg.ForceModelPrefix))
+		s.registerResolvedModelsForAuth(a, applyModelPrefixes(models, a.Prefix, s.cfg != nil && s.cfg.ForceModelPrefix))
 		return
 	}
 

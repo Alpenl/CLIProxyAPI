@@ -13,11 +13,11 @@ func TestGetRequestDetails_PreservesSuffix(t *testing.T) {
 	modelRegistry := registry.GetGlobalRegistry()
 	now := time.Now().Unix()
 
-	modelRegistry.RegisterClient("test-request-details-codex-primary", "codex", []*registry.ModelInfo{
+	modelRegistry.RegisterClient("test-request-details-codex-primary", []*registry.ModelInfo{
 		{ID: "gpt-5.3-codex", Created: now + 30},
 		{ID: "gpt-5.2", Created: now + 20},
 	})
-	modelRegistry.RegisterClient("test-request-details-codex-secondary", "codex", []*registry.ModelInfo{
+	modelRegistry.RegisterClient("test-request-details-codex-secondary", []*registry.ModelInfo{
 		{ID: "gpt-5-codex-mini", Created: now + 10},
 	})
 

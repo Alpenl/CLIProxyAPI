@@ -49,20 +49,20 @@ func TestParseOpenAIUsageResponses(t *testing.T) {
 func TestResolveUsageSourceIgnoresRemovedProviderShortcuts(t *testing.T) {
 	t.Parallel()
 
-	geminiCLI := &cliproxyauth.Auth{
-		ID:       "legacy-gemini-auth",
-		Provider: "gemini-cli",
+	legacyA := &cliproxyauth.Auth{
+		ID:       "legacy-auth-a",
+		Provider: "legacy-a",
 	}
-	if got := resolveUsageSource(geminiCLI, ""); got != "" {
-		t.Fatalf("resolveUsageSource(gemini-cli) = %q, want empty", got)
+	if got := resolveUsageSource(legacyA, ""); got != "" {
+		t.Fatalf("resolveUsageSource(legacy-a) = %q, want empty", got)
 	}
 
-	vertex := &cliproxyauth.Auth{
-		ID:       "legacy-vertex-auth",
-		Provider: "vertex",
+	legacyB := &cliproxyauth.Auth{
+		ID:       "legacy-auth-b",
+		Provider: "legacy-b",
 		Metadata: map[string]any{"project_id": "legacy-project"},
 	}
-	if got := resolveUsageSource(vertex, ""); got != "" {
-		t.Fatalf("resolveUsageSource(vertex) = %q, want empty", got)
+	if got := resolveUsageSource(legacyB, ""); got != "" {
+		t.Fatalf("resolveUsageSource(legacy-b) = %q, want empty", got)
 	}
 }

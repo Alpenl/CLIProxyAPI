@@ -1,6 +1,5 @@
-// Package cmd provides command-line interface functionality for the CLI Proxy API server.
-// It includes authentication flows for various AI service providers, service startup,
-// and other command-line operations.
+// Package cmd provides command-line interface functionality for the Codex proxy server.
+// It includes service startup, local management helpers, and other CLI operations.
 package cmd
 
 import (

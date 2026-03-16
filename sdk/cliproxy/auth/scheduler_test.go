@@ -57,11 +57,11 @@ func newSchedulerForTest(selector Selector, auths ...*Auth) *authScheduler {
 	return scheduler
 }
 
-func registerSchedulerModels(t *testing.T, provider string, model string, authIDs ...string) {
+func registerSchedulerModels(t *testing.T, model string, authIDs ...string) {
 	t.Helper()
 	reg := registry.GetGlobalRegistry()
 	for _, authID := range authIDs {
-		reg.RegisterClient(authID, provider, []*registry.ModelInfo{{ID: model}})
+		reg.RegisterClient(authID, []*registry.ModelInfo{{ID: model}})
 	}
 	t.Cleanup(func() {
 		for _, authID := range authIDs {
@@ -75,14 +75,14 @@ func TestSchedulerPick_RoundRobinHighestPriority(t *testing.T) {
 
 	scheduler := newSchedulerForTest(
 		&RoundRobinSelector{},
-		&Auth{ID: "low", Provider: "gemini", Attributes: map[string]string{"priority": "0"}},
-		&Auth{ID: "high-b", Provider: "gemini", Attributes: map[string]string{"priority": "10"}},
-		&Auth{ID: "high-a", Provider: "gemini", Attributes: map[string]string{"priority": "10"}},
+		&Auth{ID: "low", Provider: "codex", Attributes: map[string]string{"priority": "0"}},
+		&Auth{ID: "high-b", Provider: "codex", Attributes: map[string]string{"priority": "10"}},
+		&Auth{ID: "high-a", Provider: "codex", Attributes: map[string]string{"priority": "10"}},
 	)
 
 	want := []string{"high-a", "high-b", "high-a"}
 	for index, wantID := range want {
-		got, errPick := scheduler.pickSingle(context.Background(), "gemini", "", cliproxyexecutor.Options{}, nil)
+		got, errPick := scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
 		if errPick != nil {
 			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
 		}
@@ -100,13 +100,13 @@ func TestSchedulerPick_FillFirstSticksToFirstReady(t *testing.T) {
 
 	scheduler := newSchedulerForTest(
 		&FillFirstSelector{},
-		&Auth{ID: "b", Provider: "gemini"},
-		&Auth{ID: "a", Provider: "gemini"},
-		&Auth{ID: "c", Provider: "gemini"},
+		&Auth{ID: "b", Provider: "codex"},
+		&Auth{ID: "a", Provider: "codex"},
+		&Auth{ID: "c", Provider: "codex"},
 	)
 
 	for index := 0; index < 3; index++ {
-		got, errPick := scheduler.pickSingle(context.Background(), "gemini", "", cliproxyexecutor.Options{}, nil)
+		got, errPick := scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
 		if errPick != nil {
 			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
 		}
@@ -122,13 +122,13 @@ func TestSchedulerPick_FillFirstSticksToFirstReady(t *testing.T) {
 func TestSchedulerPick_PromotesExpiredCooldownBeforePick(t *testing.T) {
 	t.Parallel()
 
-	model := "gemini-2.5-pro"
-	registerSchedulerModels(t, "gemini", model, "cooldown-expired")
+	model := "gpt-5"
+	registerSchedulerModels(t, model, "cooldown-expired")
 	scheduler := newSchedulerForTest(
 		&RoundRobinSelector{},
 		&Auth{
 			ID:       "cooldown-expired",
-			Provider: "gemini",
+			Provider: "codex",
 			ModelStates: map[string]*ModelState{
 				model: {
 					Status:         StatusError,
@@ -139,7 +139,7 @@ func TestSchedulerPick_PromotesExpiredCooldownBeforePick(t *testing.T) {
 		},
 	)
 
-	got, errPick := scheduler.pickSingle(context.Background(), "gemini", model, cliproxyexecutor.Options{}, nil)
+	got, errPick := scheduler.pickSingle(context.Background(), "codex", model, cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("pickSingle() error = %v", errPick)
 	}
@@ -177,17 +177,16 @@ func TestSchedulerPick_CodexWebsocketPrefersWebsocketEnabledSubset(t *testing.T)
 	}
 }
 
-
 func TestManagerCustomSelector_FallsBackToLegacyPath(t *testing.T) {
 	t.Parallel()
 
 	selector := &trackingSelector{}
 	manager := NewManager(nil, selector, nil)
-	manager.executors["gemini"] = schedulerTestExecutor{}
-	manager.auths["auth-a"] = &Auth{ID: "auth-a", Provider: "gemini"}
-	manager.auths["auth-b"] = &Auth{ID: "auth-b", Provider: "gemini"}
+	manager.executors["codex"] = schedulerTestExecutor{}
+	manager.auths["auth-a"] = &Auth{ID: "auth-a", Provider: "codex"}
+	manager.auths["auth-b"] = &Auth{ID: "auth-b", Provider: "codex"}
 
-	got, _, errPick := manager.pickNext(context.Background(), "gemini", "", cliproxyexecutor.Options{}, map[string]struct{}{})
+	got, _, errPick := manager.pickNext(context.Background(), "codex", "", cliproxyexecutor.Options{}, map[string]struct{}{})
 	if errPick != nil {
 		t.Fatalf("pickNext() error = %v", errPick)
 	}
@@ -226,14 +225,14 @@ func TestManager_SchedulerTracksRegisterAndUpdate(t *testing.T) {
 	t.Parallel()
 
 	manager := NewManager(nil, &RoundRobinSelector{}, nil)
-	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-b", Provider: "gemini"}); errRegister != nil {
+	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-b", Provider: "codex"}); errRegister != nil {
 		t.Fatalf("Register(auth-b) error = %v", errRegister)
 	}
-	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-a", Provider: "gemini"}); errRegister != nil {
+	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-a", Provider: "codex"}); errRegister != nil {
 		t.Fatalf("Register(auth-a) error = %v", errRegister)
 	}
 
-	got, errPick := manager.scheduler.pickSingle(context.Background(), "gemini", "", cliproxyexecutor.Options{}, nil)
+	got, errPick := manager.scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("scheduler.pickSingle() error = %v", errPick)
 	}
@@ -241,11 +240,11 @@ func TestManager_SchedulerTracksRegisterAndUpdate(t *testing.T) {
 		t.Fatalf("scheduler.pickSingle() auth = %v, want auth-a", got)
 	}
 
-	if _, errUpdate := manager.Update(context.Background(), &Auth{ID: "auth-a", Provider: "gemini", Disabled: true}); errUpdate != nil {
+	if _, errUpdate := manager.Update(context.Background(), &Auth{ID: "auth-a", Provider: "codex", Disabled: true}); errUpdate != nil {
 		t.Fatalf("Update(auth-a) error = %v", errUpdate)
 	}
 
-	got, errPick = manager.scheduler.pickSingle(context.Background(), "gemini", "", cliproxyexecutor.Options{}, nil)
+	got, errPick = manager.scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("scheduler.pickSingle() after update error = %v", errPick)
 	}
@@ -259,28 +258,28 @@ func TestManager_SchedulerTracksMarkResultCooldownAndRecovery(t *testing.T) {
 
 	manager := NewManager(nil, &RoundRobinSelector{}, nil)
 	reg := registry.GetGlobalRegistry()
-	reg.RegisterClient("auth-a", "gemini", []*registry.ModelInfo{{ID: "test-model"}})
-	reg.RegisterClient("auth-b", "gemini", []*registry.ModelInfo{{ID: "test-model"}})
+	reg.RegisterClient("auth-a", []*registry.ModelInfo{{ID: "test-model"}})
+	reg.RegisterClient("auth-b", []*registry.ModelInfo{{ID: "test-model"}})
 	t.Cleanup(func() {
 		reg.UnregisterClient("auth-a")
 		reg.UnregisterClient("auth-b")
 	})
-	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-a", Provider: "gemini"}); errRegister != nil {
+	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-a", Provider: "codex"}); errRegister != nil {
 		t.Fatalf("Register(auth-a) error = %v", errRegister)
 	}
-	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-b", Provider: "gemini"}); errRegister != nil {
+	if _, errRegister := manager.Register(context.Background(), &Auth{ID: "auth-b", Provider: "codex"}); errRegister != nil {
 		t.Fatalf("Register(auth-b) error = %v", errRegister)
 	}
 
 	manager.MarkResult(context.Background(), Result{
 		AuthID:   "auth-a",
-		Provider: "gemini",
+		Provider: "codex",
 		Model:    "test-model",
 		Success:  false,
 		Error:    &Error{HTTPStatus: 429, Message: "quota"},
 	})
 
-	got, errPick := manager.scheduler.pickSingle(context.Background(), "gemini", "test-model", cliproxyexecutor.Options{}, nil)
+	got, errPick := manager.scheduler.pickSingle(context.Background(), "codex", "test-model", cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("scheduler.pickSingle() after cooldown error = %v", errPick)
 	}
@@ -290,14 +289,14 @@ func TestManager_SchedulerTracksMarkResultCooldownAndRecovery(t *testing.T) {
 
 	manager.MarkResult(context.Background(), Result{
 		AuthID:   "auth-a",
-		Provider: "gemini",
+		Provider: "codex",
 		Model:    "test-model",
 		Success:  true,
 	})
 
 	seen := make(map[string]struct{}, 2)
 	for index := 0; index < 2; index++ {
-		got, errPick = manager.scheduler.pickSingle(context.Background(), "gemini", "test-model", cliproxyexecutor.Options{}, nil)
+		got, errPick = manager.scheduler.pickSingle(context.Background(), "codex", "test-model", cliproxyexecutor.Options{}, nil)
 		if errPick != nil {
 			t.Fatalf("scheduler.pickSingle() after recovery #%d error = %v", index, errPick)
 		}
