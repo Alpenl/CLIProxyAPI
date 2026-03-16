@@ -155,9 +155,6 @@ func (h *Handler) mergeWebConfig(body webConfigPayload, requireSecret bool) (*co
 	nextCfg.AuthDir = authDir
 
 	apiKeys := normalizeNonEmptyStrings(body.APIKeys)
-	if len(apiKeys) == 0 {
-		return nil, nil, fmt.Errorf("at least one api key is required")
-	}
 	nextCfg.APIKeys = apiKeys
 
 	secret := strings.TrimSpace(body.Management.SecretKey)

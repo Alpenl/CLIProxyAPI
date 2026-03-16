@@ -69,7 +69,7 @@ Codex 专用代理与管理控制台。
 
 ```bash
 go test ./... -count=1
-go build -o ./bin/codex-proxy ./cmd/server
+./build-release.sh
 docker build -t codex-proxy:codex-only .
 ```
 

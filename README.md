@@ -77,8 +77,8 @@ Useful verification commands:
 
 ```bash
 go test ./... -count=1
-go build -o ./bin/codex-proxy ./cmd/server
-docker build -t codex-proxy:bootstrap-ui .
+./build-release.sh
+docker build -t codex-proxy:codex-only .
 ```
 
 ## License

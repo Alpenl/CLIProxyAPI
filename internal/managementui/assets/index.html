@@ -175,7 +175,7 @@
         display: grid;
         grid-template-columns: 188px minmax(0, 1fr);
         gap: 10px;
-        align-items: stretch;
+        align-items: start;
       }
 
       .sidebar,
@@ -191,7 +191,10 @@
       .sidebar {
         position: sticky;
         top: 10px;
-        height: 100%;
+        align-self: start;
+        height: fit-content;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
         padding: 10px;
         border-radius: var(--radius-lg);
         display: grid;
@@ -3153,6 +3156,38 @@
         `;
       }
 
+      function renderBootstrapEditor() {
+        const draft = cloneConfigDraft(state.configDraft);
+        const statusText = state.bootstrapSaving
+          ? "正在写入首次配置并切换到正式管理模式。"
+          : (state.bootstrapError || "首次启动只需要设置管理密钥。其他监听、代理和客户端配置可在进入后台后再补充。");
+        const statusLevel = state.bootstrapError ? "bad" : (state.bootstrapSaving ? "warn" : "ok");
+
+        return `
+          <section class="config-grid bootstrap-simple-grid">
+            <article class="config-panel bootstrap-simple-panel">
+              <div>
+                <div class="section-kicker">首次配置</div>
+                <h3>设置管理密钥</h3>
+                <div class="helper" style="margin-top:6px;">保存后会自动生成正式配置，并直接进入后台。其他设置项稍后可在配置页面继续填写。</div>
+              </div>
+              <div class="config-form-grid">
+                <label class="field span-2">
+                  <span class="field-label">管理密钥</span>
+                  <input data-config-field="management.secretKey" type="password" value="${escapeHTML(draft.management.secretKey)}" placeholder="首次配置必须填写" autocomplete="new-password" />
+                </label>
+              </div>
+              <div class="config-status ${statusLevel}">${escapeHTML(statusText)}</div>
+              <div class="button-row">
+                <button class="button button-primary" data-action="save-bootstrap-config" type="button" ${state.bootstrapSaving ? "disabled" : ""}>
+                  ${state.bootstrapSaving ? "正在初始化..." : "完成首次配置"}
+                </button>
+              </div>
+            </article>
+          </section>
+        `;
+      }
+
       function renderConfigView() {
         return renderConfigEditor("config");
       }
@@ -3200,9 +3235,9 @@
             <div class="auth-copy">
               <div class="section-kicker">首次初始化</div>
               <h1 class="auth-title">完成基础配置后进入后台</h1>
-              <p class="auth-description">当前没有可用的正式配置。保存后会自动生成 <span class="mono">config.yaml</span>，并切换到正常的管理密钥登录模式。</p>
+              <p class="auth-description">当前没有可用的正式配置。现在只需要先设置管理密钥，进入后台后再补充其他代理配置。</p>
             </div>
-            ${renderConfigEditor("bootstrap")}
+            ${renderBootstrapEditor()}
           </section>
         `;
       }

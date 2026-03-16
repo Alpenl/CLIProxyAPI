@@ -378,6 +378,15 @@ func TestManagementControlPanel_ServesEmbeddedCodexUI(t *testing.T) {
 	if !strings.Contains(body, "overview-list") {
 		t.Fatalf("expected stable overview list structure, body=%s", body)
 	}
+	if !strings.Contains(body, "align-items: start;") {
+		t.Fatalf("expected app shell to avoid stretching sidebar height, body=%s", body)
+	}
+	if !strings.Contains(body, "height: fit-content;") {
+		t.Fatalf("expected sidebar height to follow its own content instead of filling the viewport, body=%s", body)
+	}
+	if !strings.Contains(body, "max-height: calc(100vh - 24px);") {
+		t.Fatalf("expected sidebar to remain capped by viewport height, body=%s", body)
+	}
 	if !strings.Contains(body, "quota-table") {
 		t.Fatalf("expected stable quota table structure, body=%s", body)
 	}

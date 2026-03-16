@@ -64,3 +64,18 @@ func TestLoadOrCreateConfig_CreatesBootstrapConfigWhenMissing(t *testing.T) {
 		t.Fatalf("generated config should not include quota-exceeded: %s", content)
 	}
 }
+
+func TestBootstrapRequired_OnlyDependsOnManagementSecret(t *testing.T) {
+	cfg := DefaultBootstrapConfig()
+	if !cfg.BootstrapRequired() {
+		t.Fatalf("BootstrapRequired() = false, want true when secret is missing")
+	}
+
+	cfg.RemoteManagement.SecretKey = "configured-secret"
+	cfg.APIKeys = nil
+	cfg.AuthDir = ""
+
+	if cfg.BootstrapRequired() {
+		t.Fatalf("BootstrapRequired() = true, want false once management secret is configured")
+	}
+}

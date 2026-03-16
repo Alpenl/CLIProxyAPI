@@ -70,21 +70,12 @@ func DefaultBootstrapConfig() *Config {
 	}
 }
 
-// BootstrapRequired reports whether the minimum first-run configuration is still missing.
+// BootstrapRequired reports whether the first-run management secret is still missing.
 func (cfg *Config) BootstrapRequired() bool {
 	if cfg == nil {
 		return true
 	}
-	if strings.TrimSpace(cfg.RemoteManagement.SecretKey) == "" {
-		return true
-	}
-	if len(normalizeNonEmptyStrings(cfg.APIKeys)) == 0 {
-		return true
-	}
-	if strings.TrimSpace(cfg.AuthDir) == "" {
-		return true
-	}
-	return false
+	return strings.TrimSpace(cfg.RemoteManagement.SecretKey) == ""
 }
 
 // WriteConfigFile writes a complete config file without requiring an existing YAML tree.

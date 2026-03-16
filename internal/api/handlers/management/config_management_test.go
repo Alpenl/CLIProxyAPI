@@ -105,7 +105,7 @@ usage-statistics-enabled: true
   "host": "",
   "port": 8317,
   "authDir": "./auths",
-  "apiKeys": ["client-a", "client-b"],
+  "apiKeys": [],
   "management": {
     "allowRemote": true,
     "secretKey": "bootstrap-secret"
@@ -123,6 +123,11 @@ usage-statistics-enabled: true
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 
+	payload := decodeManagementResponse(t, rr)
+	if payload["bootstrap_required"] != false {
+		t.Fatalf("bootstrap_required = %#v, want false", payload["bootstrap_required"])
+	}
+
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		t.Fatalf("failed to reload config file %s: %v", configPath, err)
@@ -133,8 +138,8 @@ usage-statistics-enabled: true
 	if cfg.RemoteManagement.SecretKey == "bootstrap-secret" {
 		t.Fatalf("RemoteManagement.SecretKey stored plaintext, want bcrypt hash")
 	}
-	if len(cfg.APIKeys) != 2 {
-		t.Fatalf("APIKeys len = %d, want 2", len(cfg.APIKeys))
+	if len(cfg.APIKeys) != 0 {
+		t.Fatalf("APIKeys len = %d, want 0", len(cfg.APIKeys))
 	}
 
 	data, err := os.ReadFile(configPath)
