@@ -98,6 +98,17 @@
         gap: 18px;
       }
 
+      .bootstrap-panel {
+        width: min(980px, 100%);
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: var(--shadow);
+        display: grid;
+        gap: 16px;
+      }
+
       .auth-copy {
         display: grid;
         gap: 8px;
@@ -325,15 +336,30 @@
       }
 
       input[type="text"],
-      input[type="password"] {
+      input[type="password"],
+      input[type="number"],
+      textarea {
         width: 100%;
-        min-height: 34px;
         padding: 0 10px;
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-sm);
         background: #fff;
         color: var(--text);
         outline: none;
+      }
+
+      input[type="text"],
+      input[type="password"],
+      input[type="number"] {
+        min-height: 34px;
+      }
+
+      textarea {
+        min-height: 96px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        resize: vertical;
+        line-height: 1.6;
       }
 
       select {
@@ -347,7 +373,9 @@
       }
 
       input[type="text"]:focus,
-      input[type="password"]:focus {
+      input[type="password"]:focus,
+      input[type="number"]:focus,
+      textarea:focus {
         border-color: #9ed9b4;
         box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
       }
@@ -512,6 +540,10 @@
 
       .view[data-route="logs"] {
         grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .view[data-route="config"] {
+        grid-auto-rows: max-content;
       }
 
       .view[data-route="import"] > .table-shell,
@@ -885,6 +917,76 @@
         gap: 6px;
       }
 
+      .config-grid,
+      .config-form-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .config-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .config-form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .config-panel {
+        display: grid;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: #fff;
+      }
+
+      .config-panel.full {
+        grid-column: 1 / -1;
+      }
+
+      .config-panel h3 {
+        margin: 0;
+      }
+
+      .config-status {
+        min-height: 42px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--bg-soft);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .config-status.ok {
+        color: #15803d;
+        border-color: #d8f7e4;
+        background: var(--accent-soft);
+      }
+
+      .config-status.warn {
+        color: #b45309;
+        border-color: #fde3c1;
+        background: var(--warn-soft);
+      }
+
+      .config-status.bad {
+        color: #b91c1c;
+        border-color: #fecaca;
+        background: var(--danger-soft);
+      }
+
+      .field.span-2 {
+        grid-column: span 2;
+      }
+
+      .config-kv {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
       .file-picker-row,
       .file-picker-grid {
         display: grid;
@@ -1056,8 +1158,16 @@
 
       @media (max-width: 760px) {
         .grid-4,
-        .grid-2 {
+        .grid-2,
+        .config-grid,
+        .config-form-grid,
+        .config-kv {
           grid-template-columns: 1fr;
+        }
+
+        .field.span-2,
+        .config-panel.full {
+          grid-column: auto;
         }
 
         .quota-toolbar-grid {
@@ -1109,6 +1219,8 @@
       </section>
     </section>
 
+    <section class="auth-shell" id="bootstrap-shell" hidden></section>
+
     <section class="backend-shell" id="backend-shell" hidden>
       <div class="drawer-backdrop" id="drawer-backdrop"></div>
 
@@ -1117,13 +1229,14 @@
           <section class="brand">
             <div class="brand-kicker">Codex 专用代理</div>
             <div class="brand-title">Codex 控制台</div>
-            <div class="brand-note">只保留账号、额度、导入和清理四类高频操作。</div>
+            <div class="brand-note">保留账号、额度、导入、日志和最小必要配置管理。</div>
           </section>
 
           <nav class="nav" aria-label="主导航">
             <a class="nav-link" data-route-link="dashboard" href="#/dashboard">仪表盘</a>
             <a class="nav-link" data-route-link="quota" href="#/quota">账号额度</a>
             <a class="nav-link" data-route-link="import" href="#/import">账号导入</a>
+            <a class="nav-link" data-route-link="config" href="#/config">配置管理</a>
             <a class="nav-link" data-route-link="logs" href="#/logs">操作日志</a>
           </nav>
 
@@ -1194,14 +1307,52 @@
           title: "账号导入",
           description: "批量导入本地导出的 Codex 账号文件，并查看导入和清理结果。",
         },
+        config: {
+          title: "配置管理",
+          description: "维护监听地址、管理密钥、客户端 API Key、账号目录和最小运行参数。",
+        },
         logs: {
           title: "操作日志",
           description: "集中查看本地操作记录，追踪导入、清理、删除和刷新行为。",
         },
       };
 
+      function defaultConfigDraft() {
+        return {
+          host: "",
+          port: 8317,
+          tls: {
+            enable: false,
+            cert: "",
+            key: "",
+          },
+          management: {
+            allowRemote: true,
+            secretKey: "",
+            secretConfigured: false,
+          },
+          authDir: "./auths",
+          apiKeysText: "",
+          proxyUrl: "",
+          loggingToFile: false,
+          logsMaxTotalSizeMB: 0,
+          errorLogsMaxFiles: 10,
+          usageStatisticsEnabled: true,
+          requestLog: false,
+          disableCooling: false,
+          requestRetry: 3,
+          maxRetryCredentials: 0,
+          maxRetryInterval: 30,
+          routingStrategy: "round-robin",
+        };
+      }
+
       const state = {
         key: localStorage.getItem(STORAGE_KEY) || "",
+        bootstrapChecked: false,
+        bootstrapRequired: false,
+        bootstrapSaving: false,
+        bootstrapError: "",
         authenticated: false,
         authChecking: false,
         authError: "",
@@ -1219,12 +1370,18 @@
         quotaRefreshInFlight: false,
         quotaAutoRefreshHandle: 0,
         quotaLastBulkRefreshAt: 0,
+        configDraft: defaultConfigDraft(),
+        configLoading: false,
+        configSaving: false,
+        configStatus: "",
+        configStatusLevel: "",
         busy: false,
       };
 
       const elements = {
         body: document.body,
         authShell: document.getElementById("auth-shell"),
+        bootstrapShell: document.getElementById("bootstrap-shell"),
         backendShell: document.getElementById("backend-shell"),
         authForm: document.getElementById("auth-form"),
         authKeyInput: document.getElementById("auth-management-key"),
@@ -1324,6 +1481,92 @@
         if (normalized === "plus") return "plus";
         if (normalized === "team") return "team";
         return normalizeString(value) || "--";
+      }
+
+      function cloneConfigDraft(value) {
+        return JSON.parse(JSON.stringify(value || defaultConfigDraft()));
+      }
+
+      function configDraftFromPayload(payload) {
+        const draft = defaultConfigDraft();
+        const source = payload && typeof payload === "object" ? payload : {};
+        const tls = source.tls && typeof source.tls === "object" ? source.tls : {};
+        const management = source.management && typeof source.management === "object" ? source.management : {};
+        draft.host = normalizeString(source.host) || "";
+        draft.port = normalizeNumber(source.port) || 8317;
+        draft.tls.enable = Boolean(tls.enable);
+        draft.tls.cert = normalizeString(tls.cert) || "";
+        draft.tls.key = normalizeString(tls.key) || "";
+        draft.management.allowRemote = management.allowRemote !== false;
+        draft.management.secretConfigured = Boolean(management.secretConfigured);
+        draft.management.secretKey = "";
+        draft.authDir = normalizeString(source.authDir) || draft.authDir;
+        draft.apiKeysText = Array.isArray(source.apiKeys) ? source.apiKeys.map((item) => String(item || "").trim()).filter(Boolean).join("\n") : "";
+        draft.proxyUrl = normalizeString(source.proxyUrl) || "";
+        draft.loggingToFile = Boolean(source.loggingToFile);
+        draft.logsMaxTotalSizeMB = normalizeNumber(source.logsMaxTotalSizeMB) || 0;
+        draft.errorLogsMaxFiles = normalizeNumber(source.errorLogsMaxFiles);
+        if (draft.errorLogsMaxFiles === null) draft.errorLogsMaxFiles = 10;
+        draft.usageStatisticsEnabled = source.usageStatisticsEnabled !== false;
+        draft.requestLog = Boolean(source.requestLog);
+        draft.disableCooling = Boolean(source.disableCooling);
+        draft.requestRetry = normalizeNumber(source.requestRetry);
+        if (draft.requestRetry === null) draft.requestRetry = 3;
+        draft.maxRetryCredentials = normalizeNumber(source.maxRetryCredentials);
+        if (draft.maxRetryCredentials === null) draft.maxRetryCredentials = 0;
+        draft.maxRetryInterval = normalizeNumber(source.maxRetryInterval);
+        if (draft.maxRetryInterval === null) draft.maxRetryInterval = 30;
+        draft.routingStrategy = normalizeString(source.routingStrategy) || "round-robin";
+        return draft;
+      }
+
+      function buildConfigPayloadFromDraft(draft) {
+        const current = cloneConfigDraft(draft);
+        const apiKeys = String(current.apiKeysText || "")
+          .split(/\r?\n|,/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+        return {
+          host: String(current.host || "").trim(),
+          port: Number(current.port || 0),
+          tls: {
+            enable: Boolean(current.tls && current.tls.enable),
+            cert: String(current.tls && current.tls.cert || "").trim(),
+            key: String(current.tls && current.tls.key || "").trim(),
+          },
+          management: {
+            allowRemote: Boolean(current.management && current.management.allowRemote),
+            secretKey: String(current.management && current.management.secretKey || "").trim(),
+          },
+          authDir: String(current.authDir || "").trim(),
+          apiKeys,
+          proxyUrl: String(current.proxyUrl || "").trim(),
+          loggingToFile: Boolean(current.loggingToFile),
+          logsMaxTotalSizeMB: Number(current.logsMaxTotalSizeMB || 0),
+          errorLogsMaxFiles: Number(current.errorLogsMaxFiles || 0),
+          usageStatisticsEnabled: Boolean(current.usageStatisticsEnabled),
+          requestLog: Boolean(current.requestLog),
+          disableCooling: Boolean(current.disableCooling),
+          requestRetry: Number(current.requestRetry || 0),
+          maxRetryCredentials: Number(current.maxRetryCredentials || 0),
+          maxRetryInterval: Number(current.maxRetryInterval || 0),
+          routingStrategy: String(current.routingStrategy || "round-robin"),
+        };
+      }
+
+      function setConfigField(path, value) {
+        const draft = cloneConfigDraft(state.configDraft);
+        let target = draft;
+        const segments = path.split(".");
+        for (let index = 0; index < segments.length - 1; index += 1) {
+          const segment = segments[index];
+          if (!target[segment] || typeof target[segment] !== "object") {
+            target[segment] = {};
+          }
+          target = target[segment];
+        }
+        target[segments[segments.length - 1]] = value;
+        state.configDraft = draft;
       }
 
       function resolveCodexAccountId(account) {
@@ -1755,6 +1998,126 @@
         return false;
       }
 
+      async function checkBootstrapStatus(options = {}) {
+        try {
+          const payload = await api("/v0/management/bootstrap/status");
+          state.bootstrapChecked = true;
+          state.bootstrapRequired = Boolean(payload.bootstrap_required);
+          state.bootstrapError = "";
+          state.configDraft = configDraftFromPayload(payload.config);
+          if (!state.bootstrapRequired && options.loadConfigWhenReady !== false) {
+            if (state.authenticated) {
+              loadWebConfig({ silentError: true }).catch(() => {});
+            }
+          }
+          renderApp();
+          return payload;
+        } catch (error) {
+          state.bootstrapChecked = true;
+          state.bootstrapRequired = false;
+          state.bootstrapError = error.message || "初始化状态检查失败";
+          renderApp();
+          if (!options.silentError) {
+            addLog(`检查初始化状态失败：${state.bootstrapError}`, "error");
+          }
+          throw error;
+        }
+      }
+
+      async function loadWebConfig(options = {}) {
+        if (!state.authenticated) {
+          return;
+        }
+        state.configLoading = true;
+        renderApp();
+        try {
+          const payload = await api("/v0/management/config");
+          state.configDraft = configDraftFromPayload(payload.config);
+          if (!options.silentStatus) {
+            state.configStatus = "已加载当前配置。";
+            state.configStatusLevel = "ok";
+          }
+          renderApp();
+        } catch (error) {
+          if (!options.silentError) {
+            state.configStatus = `读取配置失败：${error.message}`;
+            state.configStatusLevel = "bad";
+            addLog(`读取配置失败：${error.message}`, "error");
+          }
+          renderApp();
+          throw error;
+        } finally {
+          state.configLoading = false;
+        }
+      }
+
+      async function saveBootstrapConfig() {
+        const payload = buildConfigPayloadFromDraft(state.configDraft);
+        const secret = payload.management.secretKey;
+
+        state.bootstrapSaving = true;
+        state.bootstrapError = "";
+        renderApp();
+
+        try {
+          const result = await api("/v0/management/bootstrap/config", {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          });
+
+          state.bootstrapSaving = false;
+          state.bootstrapRequired = false;
+          state.configDraft = configDraftFromPayload(result.config);
+          state.configStatus = result.restart_required ? `配置已保存，以下字段需要重启后生效：${(result.restart_fields || []).join("、")}` : "配置已保存并已应用。";
+          state.configStatusLevel = result.restart_required ? "warn" : "ok";
+          addLog("首次配置已保存，正在进入后台");
+
+          const ok = await authenticateKey(secret, { silentError: false });
+          if (ok) {
+            addLog("首次初始化完成，已进入后台");
+            loadWebConfig({ silentError: true, silentStatus: true }).catch(() => {});
+          }
+        } catch (error) {
+          state.bootstrapSaving = false;
+          state.bootstrapError = error.message || "首次配置保存失败";
+          renderApp();
+          addLog(`首次配置保存失败：${state.bootstrapError}`, "error");
+        }
+      }
+
+      async function saveWebConfig() {
+        if (!ensureManagementKey("保存配置")) return;
+
+        const payload = buildConfigPayloadFromDraft(state.configDraft);
+        const nextSecret = payload.management.secretKey;
+
+        state.configSaving = true;
+        renderApp();
+
+        try {
+          const result = await api("/v0/management/config", {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          });
+
+          if (nextSecret) {
+            setKey(nextSecret);
+          }
+          state.configDraft = configDraftFromPayload(result.config);
+          state.configSaving = false;
+          state.configStatus = result.restart_required ? `配置已保存，以下字段需要重启后生效：${(result.restart_fields || []).join("、")}` : "配置已保存并已热生效。";
+          state.configStatusLevel = result.restart_required ? "warn" : "ok";
+          addLog(result.restart_required ? `配置已保存，需重启生效：${(result.restart_fields || []).join("、")}` : "配置已保存并已热生效");
+          renderApp();
+        } catch (error) {
+          state.configSaving = false;
+          state.configStatus = `保存配置失败：${error.message}`;
+          state.configStatusLevel = "bad";
+          renderApp();
+          addLog(`保存配置失败：${error.message}`, "error");
+        }
+      }
+
       async function loadOverview(options = {}) {
         if (!state.key) {
           resetOverviewState();
@@ -1804,6 +2167,7 @@
           state.authChecking = false;
           state.authError = "";
           renderApp();
+          loadWebConfig({ silentError: true, silentStatus: true }).catch(() => {});
           return true;
         } catch (error) {
           if (options.clearStoredOnError) {
@@ -2645,6 +3009,154 @@
         `;
       }
 
+      function renderConfigEditor(mode) {
+        const draft = cloneConfigDraft(state.configDraft);
+        const isBootstrap = mode === "bootstrap";
+        const saving = isBootstrap ? state.bootstrapSaving : state.configSaving;
+        const loading = isBootstrap ? false : state.configLoading;
+        const statusText = isBootstrap
+          ? (state.bootstrapSaving ? "正在写入首次配置并切换到正式管理模式。" : (state.bootstrapError || "首次启动已进入初始化模式。完成配置后会生成正式 config.yaml，并切换为管理密钥登录。"))
+          : (state.configLoading ? "正在读取当前配置。" : (state.configStatus || "改动会写入 config.yaml。host、port、TLS 变更需要重启服务后生效。"));
+        const statusLevel = isBootstrap
+          ? (state.bootstrapError ? "bad" : (state.bootstrapSaving ? "warn" : "ok"))
+          : (state.configStatusLevel || (state.configLoading ? "warn" : "ok"));
+        const secretHint = isBootstrap
+          ? "首次配置必须设置管理密钥。保存后会自动进入后台。"
+          : (draft.management.secretConfigured ? "管理密钥已设置。留空表示保持不变；填写新值表示立即替换。" : "当前尚未设置管理密钥。");
+
+        return `
+          <section class="config-grid">
+            <article class="config-panel">
+              <div>
+                <div class="section-kicker">${isBootstrap ? "首次配置" : "服务监听"}</div>
+                <h3>${isBootstrap ? "初始化基础参数" : "访问入口"}</h3>
+                <div class="helper" style="margin-top:6px;">${isBootstrap ? "这一步会创建正式配置文件，并将服务切换到正常管理模式。" : "未填写 host 时同时监听 IPv4 / IPv6；监听地址和 TLS 相关字段保存后需要重启。"} </div>
+              </div>
+              <div class="config-form-grid">
+                <label class="field">
+                  <span class="field-label">监听地址</span>
+                  <input data-config-field="host" type="text" value="${escapeHTML(draft.host)}" placeholder="留空表示监听全部接口" />
+                </label>
+                <label class="field">
+                  <span class="field-label">端口</span>
+                  <input data-config-field="port" type="number" min="1" max="65535" value="${escapeHTML(draft.port)}" />
+                </label>
+                <label class="field">
+                  <span class="field-label">账号目录</span>
+                  <input data-config-field="authDir" type="text" value="${escapeHTML(draft.authDir)}" placeholder="./auths" />
+                </label>
+                <label class="field">
+                  <span class="field-label">上游代理</span>
+                  <input data-config-field="proxyUrl" type="text" value="${escapeHTML(draft.proxyUrl)}" placeholder="http://127.0.0.1:7890" />
+                </label>
+              </div>
+            </article>
+
+            <article class="config-panel">
+              <div>
+                <div class="section-kicker">${isBootstrap ? "首次配置" : "管理访问"}</div>
+                <h3>管理与 TLS</h3>
+                <div class="helper" style="margin-top:6px;">${escapeHTML(secretHint)}</div>
+              </div>
+              <div class="config-form-grid">
+                <label class="switch-row">
+                  <input data-config-field="management.allowRemote" type="checkbox" ${draft.management.allowRemote ? "checked" : ""} />
+                  <span>允许远程访问管理接口</span>
+                </label>
+                <label class="switch-row">
+                  <input data-config-field="tls.enable" type="checkbox" ${draft.tls.enable ? "checked" : ""} />
+                  <span>启用 TLS / HTTPS</span>
+                </label>
+                <label class="field span-2">
+                  <span class="field-label">管理密钥</span>
+                  <input data-config-field="management.secretKey" type="password" value="${escapeHTML(draft.management.secretKey)}" placeholder="${isBootstrap ? "首次配置必须填写" : "留空表示保持当前密钥"}" autocomplete="new-password" />
+                </label>
+                <label class="field">
+                  <span class="field-label">证书路径</span>
+                  <input data-config-field="tls.cert" type="text" value="${escapeHTML(draft.tls.cert)}" placeholder="/path/to/fullchain.pem" />
+                </label>
+                <label class="field">
+                  <span class="field-label">私钥路径</span>
+                  <input data-config-field="tls.key" type="text" value="${escapeHTML(draft.tls.key)}" placeholder="/path/to/privkey.pem" />
+                </label>
+              </div>
+            </article>
+
+            <article class="config-panel full">
+              <div>
+                <div class="section-kicker">${isBootstrap ? "首次配置" : "代理运行"}</div>
+                <h3>客户端密钥与运行策略</h3>
+                <div class="helper" style="margin-top:6px;">客户端访问 <span class="mono">/v1/*</span> 时使用下列 API Key；每行一个。其余参数仅保留 Codex 代理运行需要的最小集合。</div>
+              </div>
+              <div class="config-form-grid">
+                <label class="field span-2">
+                  <span class="field-label">客户端 API Key</span>
+                  <textarea data-config-field="apiKeysText" placeholder="每行一个 API Key">${escapeHTML(draft.apiKeysText)}</textarea>
+                </label>
+                <label class="switch-row">
+                  <input data-config-field="usageStatisticsEnabled" type="checkbox" ${draft.usageStatisticsEnabled ? "checked" : ""} />
+                  <span>启用用量统计</span>
+                </label>
+                <label class="switch-row">
+                  <input data-config-field="requestLog" type="checkbox" ${draft.requestLog ? "checked" : ""} />
+                  <span>记录 Codex 请求日志</span>
+                </label>
+                <label class="switch-row">
+                  <input data-config-field="loggingToFile" type="checkbox" ${draft.loggingToFile ? "checked" : ""} />
+                  <span>将运行日志写入文件</span>
+                </label>
+                <label class="switch-row">
+                  <input data-config-field="disableCooling" type="checkbox" ${draft.disableCooling ? "checked" : ""} />
+                  <span>关闭额度冷却调度</span>
+                </label>
+                <div class="config-kv field span-2">
+                  <label class="field">
+                    <span class="field-label">日志总大小 MB</span>
+                    <input data-config-field="logsMaxTotalSizeMB" type="number" min="0" value="${escapeHTML(draft.logsMaxTotalSizeMB)}" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">错误日志保留数</span>
+                    <input data-config-field="errorLogsMaxFiles" type="number" min="0" value="${escapeHTML(draft.errorLogsMaxFiles)}" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">路由策略</span>
+                    <select data-config-field="routingStrategy">
+                      <option value="round-robin" ${draft.routingStrategy === "round-robin" ? "selected" : ""}>轮询</option>
+                      <option value="fill-first" ${draft.routingStrategy === "fill-first" ? "selected" : ""}>填满优先</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="config-kv field span-2">
+                  <label class="field">
+                    <span class="field-label">请求重试次数</span>
+                    <input data-config-field="requestRetry" type="number" min="0" value="${escapeHTML(draft.requestRetry)}" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">最大重试账号数</span>
+                    <input data-config-field="maxRetryCredentials" type="number" min="0" value="${escapeHTML(draft.maxRetryCredentials)}" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">最大重试等待秒数</span>
+                    <input data-config-field="maxRetryInterval" type="number" min="0" value="${escapeHTML(draft.maxRetryInterval)}" />
+                  </label>
+                </div>
+              </div>
+              <div class="config-status ${statusLevel ? statusLevel : ""}">${escapeHTML(statusText)}</div>
+              <div class="button-row">
+                <button class="button button-primary" data-action="${isBootstrap ? "save-bootstrap-config" : "save-config"}" type="button" ${saving || loading ? "disabled" : ""}>
+                  ${isBootstrap ? (saving ? "正在初始化..." : "完成首次配置") : (saving ? "正在保存..." : "保存配置")}
+                </button>
+                ${!isBootstrap ? '<button class="button button-secondary" data-action="reload-config" type="button">重新读取</button>' : ""}
+              </div>
+            </article>
+          </section>
+        `;
+      }
+
+      function renderConfigView() {
+        return renderConfigEditor("config");
+      }
+
       function renderLogsView() {
         const summary = accountSummary();
         const usage = usageSummary();
@@ -2674,12 +3186,34 @@
         `;
       }
 
+      function renderBootstrapShell() {
+        const visible = state.bootstrapChecked && state.bootstrapRequired;
+        elements.bootstrapShell.hidden = !visible;
+        if (!visible) {
+          elements.bootstrapShell.innerHTML = "";
+          return;
+        }
+        elements.authShell.hidden = true;
+        elements.backendShell.hidden = true;
+        elements.bootstrapShell.innerHTML = `
+          <section class="bootstrap-panel">
+            <div class="auth-copy">
+              <div class="section-kicker">首次初始化</div>
+              <h1 class="auth-title">完成基础配置后进入后台</h1>
+              <p class="auth-description">当前没有可用的正式配置。保存后会自动生成 <span class="mono">config.yaml</span>，并切换到正常的管理密钥登录模式。</p>
+            </div>
+            ${renderConfigEditor("bootstrap")}
+          </section>
+        `;
+      }
+
       function renderAuthShell() {
-        const backendVisible = state.authenticated;
-        elements.authShell.hidden = backendVisible;
+        const backendVisible = state.authenticated && !state.bootstrapRequired;
+        const authVisible = !backendVisible && !state.bootstrapRequired;
+        elements.authShell.hidden = !authVisible;
         elements.backendShell.hidden = !backendVisible;
 
-        if (backendVisible) {
+        if (!authVisible) {
           return;
         }
 
@@ -2693,7 +3227,13 @@
         let statusClass = "auth-status";
         let statusText = "输入一次管理密钥后会保存在当前浏览器，下次会自动尝试进入后台。";
 
-        if (state.authChecking) {
+        if (!state.bootstrapChecked) {
+          statusClass += " warn";
+          statusText = "正在检查系统是否已经完成首次初始化。";
+        } else if (state.bootstrapError) {
+          statusClass += " bad";
+          statusText = state.bootstrapError;
+        } else if (state.authChecking) {
           statusClass += " warn";
           statusText = "正在验证管理密钥，请稍候。";
         } else if (state.authError) {
@@ -2736,6 +3276,7 @@
           dashboard: renderDashboardView,
           quota: renderQuotaView,
           import: renderImportView,
+          config: renderConfigView,
           logs: renderLogsView,
         }[route];
 
@@ -2746,8 +3287,9 @@
 
       function renderApp() {
         const route = getRoute();
+        renderBootstrapShell();
         renderAuthShell();
-        if (!state.authenticated) {
+        if (state.bootstrapRequired || !state.authenticated) {
           syncQuotaAutoRefresh("");
           applyBusyState();
           return;
@@ -2822,6 +3364,18 @@
           clearLogs();
           return;
         }
+        if (button.dataset.action === "save-bootstrap-config") {
+          saveBootstrapConfig();
+          return;
+        }
+        if (button.dataset.action === "save-config") {
+          saveWebConfig();
+          return;
+        }
+        if (button.dataset.action === "reload-config") {
+          loadWebConfig().catch(() => {});
+          return;
+        }
         if (button.id === "import-directory") {
           importDirectory();
           return;
@@ -2847,6 +3401,9 @@
           setQuotaQuery(event.target.value);
           renderApp();
         }
+        if (event.target && event.target.dataset && event.target.dataset.configField) {
+          setConfigField(event.target.dataset.configField, event.target.value);
+        }
       });
 
       document.addEventListener("change", (event) => {
@@ -2860,6 +3417,12 @@
           setQuotaStatusFilter(event.target.value);
           renderApp();
         }
+        if (event.target && event.target.dataset && event.target.dataset.configField) {
+          const inputType = String(event.target.type || "").toLowerCase();
+          const value = inputType === "checkbox" ? Boolean(event.target.checked) : event.target.value;
+          setConfigField(event.target.dataset.configField, value);
+          renderApp();
+        }
       });
 
       window.addEventListener("hashchange", () => {
@@ -2870,13 +3433,21 @@
       ensureRoute();
       addLog("Codex 控制台已就绪");
       renderApp();
-      if (state.key) {
-        authenticateKey(state.key, { silentError: true, clearStoredOnError: true }).then((ok) => {
-          if (!ok) {
-            addLog("已保存的管理密钥验证失败，请重新输入", "warn");
-          }
-        });
-      }
+      checkBootstrapStatus({ silentError: true }).then((payload) => {
+        if (payload && payload.bootstrap_required) {
+          addLog("检测到首次初始化模式，请先完成配置", "warn");
+          return;
+        }
+        if (state.key) {
+          authenticateKey(state.key, { silentError: true, clearStoredOnError: true }).then((ok) => {
+            if (!ok) {
+              addLog("已保存的管理密钥验证失败，请重新输入", "warn");
+            }
+          });
+        } else {
+          renderApp();
+        }
+      }).catch(() => {});
     </script>
   </body>
 </html>

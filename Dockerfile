@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOMAXPROCS=1 go build -mod=vendor -p=1 -tags timetz
 
 FROM alpine:3.22.0
 
-RUN mkdir -p /CLIProxyAPI /etc/ssl/certs
+RUN mkdir -p /CLIProxyAPI /CLIProxyAPI/data /etc/ssl/certs
 
 COPY --from=builder ./app/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
@@ -28,4 +28,4 @@ EXPOSE 8317
 
 ENV TZ=Asia/Shanghai
 
-CMD ["./CLIProxyAPI"]
+CMD ["./CLIProxyAPI", "-config", "/CLIProxyAPI/data/config.yaml"]

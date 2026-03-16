@@ -22,11 +22,16 @@ Typical use cases:
 
 ## Quick Start
 
-1. Copy [config.example.yaml](config.example.yaml) to your own config file.
-2. Set `remote-management.secret-key`.
-3. Set at least one downstream `api-keys` entry.
-4. Start the server.
-5. Open `http://127.0.0.1:8317/management.html`.
+1. Start the server directly, even if you do not have a `config.yaml` yet.
+2. The server will auto-create a bootstrap config file on first boot.
+3. Open `http://127.0.0.1:8317/management.html`.
+4. Complete the first-time setup wizard in the browser:
+   - set the management secret
+   - set at least one downstream `api-keys` entry
+   - confirm `auth-dir` and optional proxy/logging settings
+5. After the first save, the console switches back to the normal management-key login flow.
+
+If you prefer writing config by hand, you can still start from [config.example.yaml](config.example.yaml).
 
 ## Minimal Config
 
@@ -49,6 +54,7 @@ Main pages:
 - dashboard
 - account quota
 - account import
+- config management
 - operation log
 
 Main operations:
@@ -66,7 +72,7 @@ Useful verification commands:
 ```bash
 go test ./... -count=1
 go build -o ./bin/codex-proxy ./cmd/server
-docker build -t codex-proxy:codex-only .
+docker build -t codex-proxy:bootstrap-ui .
 ```
 
 ## License

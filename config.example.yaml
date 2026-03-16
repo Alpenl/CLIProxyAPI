@@ -1,6 +1,6 @@
-# Codex-first example configuration.
-# This sample is intentionally small: one API key for clients, one auth-dir for
-# Codex OAuth JSON files, and one embedded management UI at /management.html.
+# Optional manual configuration for Codex-first mode.
+# The server can now start without any config file and create a bootstrap config
+# automatically. Use this sample only when you want to pre-write the config.
 
 # Bind host/interface. Leave empty to listen on all interfaces.
 host: ""

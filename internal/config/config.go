@@ -366,6 +366,19 @@ func NormalizeExcludedModels(models []string) []string {
 	return out
 }
 
+// HashManagementSecret hashes a plaintext management secret unless it already
+// looks like a bcrypt hash.
+func HashManagementSecret(secret string) (string, error) {
+	trimmed := strings.TrimSpace(secret)
+	if trimmed == "" {
+		return "", nil
+	}
+	if looksLikeBcrypt(trimmed) {
+		return trimmed, nil
+	}
+	return hashSecret(trimmed)
+}
+
 // hashSecret hashes the given secret using bcrypt.
 func hashSecret(secret string) (string, error) {
 	// Use default cost for simplicity.

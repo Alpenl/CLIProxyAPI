@@ -49,19 +49,46 @@ func newTestServer(t *testing.T) *Server {
 	return NewServer(cfg, authManager, configPath)
 }
 
+func newBootstrapTestServer(t *testing.T) *Server {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	authDir := filepath.Join(tmpDir, "auth")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("failed to create auth dir: %v", err)
+	}
+
+	cfg := &proxyconfig.Config{
+		Port:    0,
+		AuthDir: authDir,
+		Debug:   true,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			AllowRemote: true,
+			SecretKey:   "",
+		},
+		UsageStatisticsEnabled: true,
+	}
+
+	authManager := auth.NewManager(nil, nil, nil)
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	return NewServer(cfg, authManager, configPath)
+}
+
 func TestServerRegistersOnlyCodexRoutes(t *testing.T) {
 	testCases := []struct {
-		name   string
-		method string
-		path   string
-		body   io.Reader
+		name    string
+		method  string
+		path    string
+		body    io.Reader
 		headers map[string]string
 		wantAny []int
 	}{
 		{
-			name:   "models endpoint exists",
-			method: http.MethodGet,
-			path:   "/v1/models",
+			name:    "models endpoint exists",
+			method:  http.MethodGet,
+			path:    "/v1/models",
 			wantAny: []int{http.StatusUnauthorized, http.StatusOK},
 		},
 		{
@@ -95,15 +122,15 @@ func TestServerRegistersOnlyCodexRoutes(t *testing.T) {
 			wantAny: []int{http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
 		},
 		{
-			name:   "usage management endpoint exists",
-			method: http.MethodGet,
-			path:   "/v0/management/usage",
+			name:    "usage management endpoint exists",
+			method:  http.MethodGet,
+			path:    "/v0/management/usage",
 			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusOK},
 		},
 		{
-			name:   "codex accounts endpoint exists",
-			method: http.MethodGet,
-			path:   "/v0/management/codex/accounts",
+			name:    "codex accounts endpoint exists",
+			method:  http.MethodGet,
+			path:    "/v0/management/codex/accounts",
 			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusOK},
 		},
 		{
@@ -137,9 +164,9 @@ func TestServerRegistersOnlyCodexRoutes(t *testing.T) {
 			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusOK},
 		},
 		{
-			name:   "codex delete endpoint exists",
-			method: http.MethodDelete,
-			path:   "/v0/management/codex/accounts/example.json",
+			name:    "codex delete endpoint exists",
+			method:  http.MethodDelete,
+			path:    "/v0/management/codex/accounts/example.json",
 			wantAny: []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusBadRequest, http.StatusOK},
 		},
 	}
@@ -164,6 +191,18 @@ func TestServerRegistersOnlyCodexRoutes(t *testing.T) {
 			}
 			t.Fatalf("unexpected status code for %s %s: got %d want one of %v; body=%s", tc.method, tc.path, rr.Code, tc.wantAny, rr.Body.String())
 		})
+	}
+}
+
+func TestServerRegistersBootstrapRoutesWithoutManagementSecret(t *testing.T) {
+	server := newBootstrapTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/management/bootstrap/status", nil)
+	rr := httptest.NewRecorder()
+	server.engine.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected bootstrap status endpoint to return %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 }
 

@@ -12,9 +12,9 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
+	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
-	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
@@ -46,9 +46,12 @@ func main() {
 		log.Fatalf("failed to resolve config path: %v", err)
 	}
 
-	cfg, err := config.LoadConfig(resolvedConfigPath)
+	cfg, created, err := config.LoadOrCreateConfig(resolvedConfigPath)
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
+	}
+	if created {
+		log.Infof("created bootstrap config: %s", resolvedConfigPath)
 	}
 
 	usage.SetStatisticsEnabled(cfg.UsageStatisticsEnabled)

@@ -164,6 +164,10 @@ func (h *Handler) Middleware() gin.HandlerFunc {
 			allowRemote = cfg.RemoteManagement.AllowRemote
 			secretHash = cfg.RemoteManagement.SecretKey
 		}
+		if cfg == nil || cfg.BootstrapRequired() {
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "bootstrap required"})
+			return
+		}
 		if h.allowRemoteOverride {
 			allowRemote = true
 		}

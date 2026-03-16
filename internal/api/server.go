@@ -149,6 +149,7 @@ type Server struct {
 // Parameters:
 //   - cfg: The server configuration
 //   - authManager: core runtime auth manager
+//
 // Returns:
 //   - *Server: A new server instance
 func NewServer(cfg *config.Config, authManager *auth.Manager, configFilePath string, opts ...ServerOption) *Server {
@@ -236,13 +237,10 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, configFilePath str
 		optionState.routerConfigurator(engine, s.handlers, cfg)
 	}
 
-	// Register management routes when configuration or environment secrets are available,
-	// or when a local management password is provided (e.g. TUI mode).
-	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
-	s.managementRoutesEnabled.Store(hasManagementSecret)
-	if hasManagementSecret {
-		s.registerManagementRoutes()
-	}
+	// Management routes are always registered so bootstrap setup can run without
+	// a pre-existing config secret. Protected routes remain gated by middleware.
+	s.managementRoutesEnabled.Store(true)
+	s.registerManagementRoutes()
 
 	if optionState.keepAliveEnabled {
 		s.enableKeepAlive(optionState.keepAliveTimeout, optionState.keepAliveOnTimeout)
@@ -281,7 +279,7 @@ func (s *Server) setupRoutes() {
 		c.Redirect(http.StatusTemporaryRedirect, "/management.html")
 	})
 
-	// Management routes are registered lazily by registerManagementRoutes when a secret is configured.
+	// Management routes are registered separately and always include bootstrap endpoints.
 }
 
 func (s *Server) registerManagementRoutes() {
@@ -292,18 +290,26 @@ func (s *Server) registerManagementRoutes() {
 		return
 	}
 
-	log.Info("management routes registered after secret key configuration")
+	log.Info("management routes registered")
 
 	mgmt := s.engine.Group("/v0/management")
-	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
 	{
-		mgmt.GET("/usage", s.mgmt.GetUsageStatistics)
-		mgmt.POST("/api-call", s.mgmt.APICall)
-		mgmt.GET("/codex/accounts", s.mgmt.ListCodexAccounts)
-		mgmt.POST("/codex/import-directory", s.mgmt.ImportCodexDirectory)
-		mgmt.POST("/codex/import-files", s.mgmt.ImportCodexFiles)
-		mgmt.POST("/codex/cleanup-invalid", s.mgmt.CleanupInvalidCodexAccounts)
-		mgmt.DELETE("/codex/accounts/:name", s.mgmt.DeleteCodexAccount)
+		mgmt.GET("/bootstrap/status", s.mgmt.GetBootstrapStatus)
+		mgmt.PUT("/bootstrap/config", s.mgmt.UpdateBootstrapConfig)
+	}
+
+	protected := mgmt.Group("")
+	protected.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
+	{
+		protected.GET("/usage", s.mgmt.GetUsageStatistics)
+		protected.GET("/config", s.mgmt.GetWebConfig)
+		protected.PUT("/config", s.mgmt.UpdateWebConfig)
+		protected.POST("/api-call", s.mgmt.APICall)
+		protected.GET("/codex/accounts", s.mgmt.ListCodexAccounts)
+		protected.POST("/codex/import-directory", s.mgmt.ImportCodexDirectory)
+		protected.POST("/codex/import-files", s.mgmt.ImportCodexFiles)
+		protected.POST("/codex/cleanup-invalid", s.mgmt.CleanupInvalidCodexAccounts)
+		protected.DELETE("/codex/accounts/:name", s.mgmt.DeleteCodexAccount)
 	}
 }
 
@@ -551,37 +557,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		util.SetLogLevel(cfg)
 	}
 
-	prevSecretEmpty := true
-	if oldCfg != nil {
-		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-	}
-	newSecretEmpty := cfg.RemoteManagement.SecretKey == ""
-	if s.envManagementSecret {
-		s.registerManagementRoutes()
-		if s.managementRoutesEnabled.CompareAndSwap(false, true) {
-			log.Info("management routes enabled via MANAGEMENT_PASSWORD")
-		} else {
-			s.managementRoutesEnabled.Store(true)
-		}
-	} else {
-		switch {
-		case prevSecretEmpty && !newSecretEmpty:
-			s.registerManagementRoutes()
-			if s.managementRoutesEnabled.CompareAndSwap(false, true) {
-				log.Info("management routes enabled after secret key update")
-			} else {
-				s.managementRoutesEnabled.Store(true)
-			}
-		case !prevSecretEmpty && newSecretEmpty:
-			if s.managementRoutesEnabled.CompareAndSwap(true, false) {
-				log.Info("management routes disabled after secret key removal")
-			} else {
-				s.managementRoutesEnabled.Store(false)
-			}
-		default:
-			s.managementRoutesEnabled.Store(!newSecretEmpty)
-		}
-	}
+	s.registerManagementRoutes()
+	s.managementRoutesEnabled.Store(true)
 
 	s.updateRequestAuth(cfg)
 	s.cfg = cfg
