@@ -1,6 +1,6 @@
 package auth
 
-// Error describes an authentication related failure in a provider agnostic format.
+// Error describes an authentication related failure in a backend-agnostic format.
 type Error struct {
 	// Code is a short machine readable identifier.
 	Code string `json:"code,omitempty"`

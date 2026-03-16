@@ -2,7 +2,7 @@
 
 Codex 专用代理与管理控制台。
 
-这个分支已经刻意删除所有非 Codex provider 的产品路径，只保留：
+这个分支已经刻意删除所有非 Codex 的产品路径，只保留：
 
 - Codex OAuth 账号
 - Codex API Key

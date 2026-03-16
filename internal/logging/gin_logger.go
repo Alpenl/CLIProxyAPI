@@ -21,7 +21,6 @@ var aiAPIPrefixes = []string{
 	"/v1/chat/completions",
 	"/v1/completions",
 	"/v1/responses",
-	"/api/provider/",
 }
 
 const skipGinLogKey = "__gin_skip_request_logging__"

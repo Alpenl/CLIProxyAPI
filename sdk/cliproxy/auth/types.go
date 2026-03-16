@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	baseauth "github.com/router-for-me/CLIProxyAPI/v6/internal/auth"
@@ -378,20 +377,7 @@ func (a *Auth) ExpirationTime() (time.Time, bool) {
 	return time.Time{}, false
 }
 
-var (
-	refreshLeadMu        sync.RWMutex
-	refreshLeadFactories = make(map[string]func() *time.Duration)
-)
-
-func RegisterRefreshLeadProvider(provider string, factory func() *time.Duration) {
-	provider = strings.ToLower(strings.TrimSpace(provider))
-	if provider == "" || factory == nil {
-		return
-	}
-	refreshLeadMu.Lock()
-	refreshLeadFactories[provider] = factory
-	refreshLeadMu.Unlock()
-}
+const defaultCodexRefreshLead = 5 * 24 * time.Hour
 
 var expireKeys = [...]string{"expired", "expire", "expires_at", "expiresAt", "expiry", "expires"}
 
@@ -427,8 +413,7 @@ func expirationFromMap(meta map[string]any) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-func ProviderRefreshLead(provider string, runtime any) *time.Duration {
-	provider = strings.ToLower(strings.TrimSpace(provider))
+func RefreshLead(runtime any) *time.Duration {
 	if runtime != nil {
 		if eval, ok := runtime.(interface{ RefreshLead() *time.Duration }); ok {
 			if lead := eval.RefreshLead(); lead != nil && *lead > 0 {
@@ -436,16 +421,8 @@ func ProviderRefreshLead(provider string, runtime any) *time.Duration {
 			}
 		}
 	}
-	refreshLeadMu.RLock()
-	factory := refreshLeadFactories[provider]
-	refreshLeadMu.RUnlock()
-	if factory == nil {
-		return nil
-	}
-	if lead := factory(); lead != nil && *lead > 0 {
-		return lead
-	}
-	return nil
+	lead := defaultCodexRefreshLead
+	return &lead
 }
 
 func parseTimeValue(v any) (time.Time, bool) {

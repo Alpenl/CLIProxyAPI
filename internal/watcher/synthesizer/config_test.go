@@ -42,7 +42,7 @@ func TestConfigSynthesizer_Synthesize_CodexKeys(t *testing.T) {
 
 	auth := auths[0]
 	if auth.Provider != "codex" {
-		t.Fatalf("expected provider codex, got %s", auth.Provider)
+		t.Fatalf("expected auth type codex, got %s", auth.Provider)
 	}
 	if auth.Label != "codex-apikey" {
 		t.Fatalf("expected label codex-apikey, got %s", auth.Label)
@@ -91,6 +91,6 @@ func TestConfigSynthesizer_Synthesize_CodexOnlyIgnoresNonCodexProviders(t *testi
 		t.Fatalf("expected only 1 codex auth, got %d", len(auths))
 	}
 	if auths[0].Provider != "codex" {
-		t.Fatalf("expected codex provider, got %s", auths[0].Provider)
+		t.Fatalf("expected auth type codex, got %s", auths[0].Provider)
 	}
 }

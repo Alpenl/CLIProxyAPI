@@ -39,7 +39,7 @@ type trackingSelector struct {
 	lastAuthID []string
 }
 
-func (s *trackingSelector) Pick(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
+func (s *trackingSelector) Pick(ctx context.Context, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
 	s.calls++
 	s.lastAuthID = s.lastAuthID[:0]
 	for _, auth := range auths {
@@ -82,7 +82,7 @@ func TestSchedulerPick_RoundRobinHighestPriority(t *testing.T) {
 
 	want := []string{"high-a", "high-b", "high-a"}
 	for index, wantID := range want {
-		got, errPick := scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
+		got, errPick := scheduler.pickSingle(context.Background(), "", cliproxyexecutor.Options{}, nil)
 		if errPick != nil {
 			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
 		}
@@ -106,7 +106,7 @@ func TestSchedulerPick_FillFirstSticksToFirstReady(t *testing.T) {
 	)
 
 	for index := 0; index < 3; index++ {
-		got, errPick := scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
+		got, errPick := scheduler.pickSingle(context.Background(), "", cliproxyexecutor.Options{}, nil)
 		if errPick != nil {
 			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
 		}
@@ -139,7 +139,7 @@ func TestSchedulerPick_PromotesExpiredCooldownBeforePick(t *testing.T) {
 		},
 	)
 
-	got, errPick := scheduler.pickSingle(context.Background(), "codex", model, cliproxyexecutor.Options{}, nil)
+	got, errPick := scheduler.pickSingle(context.Background(), model, cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("pickSingle() error = %v", errPick)
 	}
@@ -164,7 +164,7 @@ func TestSchedulerPick_CodexWebsocketPrefersWebsocketEnabledSubset(t *testing.T)
 	ctx := cliproxyexecutor.WithDownstreamWebsocket(context.Background())
 	want := []string{"codex-ws-a", "codex-ws-b", "codex-ws-a"}
 	for index, wantID := range want {
-		got, errPick := scheduler.pickSingle(ctx, "codex", "", cliproxyexecutor.Options{}, nil)
+		got, errPick := scheduler.pickSingle(ctx, "", cliproxyexecutor.Options{}, nil)
 		if errPick != nil {
 			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
 		}
@@ -182,11 +182,11 @@ func TestManagerCustomSelector_FallsBackToLegacyPath(t *testing.T) {
 
 	selector := &trackingSelector{}
 	manager := NewManager(nil, selector, nil)
-	manager.executors["codex"] = schedulerTestExecutor{}
+	manager.executor = schedulerTestExecutor{}
 	manager.auths["auth-a"] = &Auth{ID: "auth-a", Provider: "codex"}
 	manager.auths["auth-b"] = &Auth{ID: "auth-b", Provider: "codex"}
 
-	got, _, errPick := manager.pickNext(context.Background(), "codex", "", cliproxyexecutor.Options{}, map[string]struct{}{})
+	got, _, errPick := manager.pickNext(context.Background(), "", cliproxyexecutor.Options{}, map[string]struct{}{})
 	if errPick != nil {
 		t.Fatalf("pickNext() error = %v", errPick)
 	}
@@ -232,7 +232,7 @@ func TestManager_SchedulerTracksRegisterAndUpdate(t *testing.T) {
 		t.Fatalf("Register(auth-a) error = %v", errRegister)
 	}
 
-	got, errPick := manager.scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
+	got, errPick := manager.scheduler.pickSingle(context.Background(), "", cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("scheduler.pickSingle() error = %v", errPick)
 	}
@@ -244,7 +244,7 @@ func TestManager_SchedulerTracksRegisterAndUpdate(t *testing.T) {
 		t.Fatalf("Update(auth-a) error = %v", errUpdate)
 	}
 
-	got, errPick = manager.scheduler.pickSingle(context.Background(), "codex", "", cliproxyexecutor.Options{}, nil)
+	got, errPick = manager.scheduler.pickSingle(context.Background(), "", cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("scheduler.pickSingle() after update error = %v", errPick)
 	}
@@ -273,13 +273,12 @@ func TestManager_SchedulerTracksMarkResultCooldownAndRecovery(t *testing.T) {
 
 	manager.MarkResult(context.Background(), Result{
 		AuthID:   "auth-a",
-		Provider: "codex",
 		Model:    "test-model",
 		Success:  false,
 		Error:    &Error{HTTPStatus: 429, Message: "quota"},
 	})
 
-	got, errPick := manager.scheduler.pickSingle(context.Background(), "codex", "test-model", cliproxyexecutor.Options{}, nil)
+	got, errPick := manager.scheduler.pickSingle(context.Background(), "test-model", cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("scheduler.pickSingle() after cooldown error = %v", errPick)
 	}
@@ -289,14 +288,13 @@ func TestManager_SchedulerTracksMarkResultCooldownAndRecovery(t *testing.T) {
 
 	manager.MarkResult(context.Background(), Result{
 		AuthID:   "auth-a",
-		Provider: "codex",
 		Model:    "test-model",
 		Success:  true,
 	})
 
 	seen := make(map[string]struct{}, 2)
 	for index := 0; index < 2; index++ {
-		got, errPick = manager.scheduler.pickSingle(context.Background(), "codex", "test-model", cliproxyexecutor.Options{}, nil)
+		got, errPick = manager.scheduler.pickSingle(context.Background(), "test-model", cliproxyexecutor.Options{}, nil)
 		if errPick != nil {
 			t.Fatalf("scheduler.pickSingle() after recovery #%d error = %v", index, errPick)
 		}

@@ -11,7 +11,7 @@ import (
 
 // Context encapsulates execution state shared across middleware, translators, and executors.
 type Context struct {
-	// Request encapsulates the provider facing request payload.
+	// Request encapsulates the upstream-facing request payload.
 	Request cliproxyexecutor.Request
 	// Options carries execution flags (streaming, headers, etc.).
 	Options cliproxyexecutor.Options

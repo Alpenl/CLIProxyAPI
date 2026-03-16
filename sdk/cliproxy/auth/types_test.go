@@ -1,6 +1,9 @@
 package auth
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestToolPrefixDisabled(t *testing.T) {
 	var a *Auth
@@ -31,5 +34,15 @@ func TestToolPrefixDisabled(t *testing.T) {
 	a = &Auth{Metadata: map[string]any{"tool_prefix_disabled": false}}
 	if a.ToolPrefixDisabled() {
 		t.Error("should return false when set to false")
+	}
+}
+
+func TestRefreshLeadDefaultsToCodexWindow(t *testing.T) {
+	lead := RefreshLead(nil)
+	if lead == nil {
+		t.Fatal("expected default refresh lead")
+	}
+	if *lead != 5*24*time.Hour {
+		t.Fatalf("default refresh lead = %v, want %v", *lead, 5*24*time.Hour)
 	}
 }

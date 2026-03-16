@@ -150,16 +150,12 @@ func captureRequestInfo(c *gin.Context, captureBody bool) (*RequestInfo, error) 
 }
 
 // shouldLogRequest determines whether the request should be logged.
-// It skips management endpoints to avoid leaking secrets but allows
-// all other routes, including module-provided ones, to honor request-log.
+// It skips management endpoints to avoid leaking secrets and ignores
+// the removed legacy /api surface entirely.
 func shouldLogRequest(path string) bool {
 	if strings.HasPrefix(path, "/v0/management") || strings.HasPrefix(path, "/management") {
 		return false
 	}
 
-	if strings.HasPrefix(path, "/api") {
-		return strings.HasPrefix(path, "/api/provider")
-	}
-
-	return true
+	return !strings.HasPrefix(path, "/api")
 }

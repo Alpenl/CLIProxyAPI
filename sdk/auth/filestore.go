@@ -190,9 +190,9 @@ func (s *FileTokenStore) readAuthFile(path, baseDir string) (*cliproxyauth.Auth,
 	if err = json.Unmarshal(data, &metadata); err != nil {
 		return nil, fmt.Errorf("unmarshal auth json: %w", err)
 	}
-	provider, _ := metadata["type"].(string)
-	provider = strings.ToLower(strings.TrimSpace(provider))
-	if provider != "codex" {
+	authType, _ := metadata["type"].(string)
+	authType = strings.ToLower(strings.TrimSpace(authType))
+	if authType != "codex" {
 		return nil, nil
 	}
 	info, err := os.Stat(path)
@@ -207,7 +207,7 @@ func (s *FileTokenStore) readAuthFile(path, baseDir string) (*cliproxyauth.Auth,
 	}
 	auth := &cliproxyauth.Auth{
 		ID:               id,
-		Provider:         provider,
+		Provider:         authType,
 		FileName:         id,
 		Label:            s.labelFor(metadata),
 		Status:           status,

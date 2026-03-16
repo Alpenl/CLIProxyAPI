@@ -87,15 +87,12 @@ func TestGetRequestDetails_PreservesSuffix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			provider, model, errMsg := handler.getRequestDetails(tt.inputModel)
+			model, errMsg := handler.getRequestDetails(tt.inputModel)
 			if (errMsg != nil) != tt.wantErr {
 				t.Fatalf("getRequestDetails() error = %v, wantErr %v", errMsg, tt.wantErr)
 			}
 			if errMsg != nil {
 				return
-			}
-			if provider != "codex" {
-				t.Fatalf("getRequestDetails() provider = %v, want %v", provider, "codex")
 			}
 			if model != tt.wantModel {
 				t.Fatalf("getRequestDetails() model = %v, want %v", model, tt.wantModel)

@@ -387,7 +387,7 @@ func (r *ModelRegistry) addModelRegistration(modelID string, model *ModelInfo, n
 		SuspendedClients:     make(map[string]string),
 	}
 	r.models[modelID] = registration
-	log.Debugf("Registered new model %s from provider %s", modelID, constant.Codex)
+	log.Debugf("registered new model %s for auth type %s", modelID, constant.Codex)
 }
 
 func (r *ModelRegistry) removeModelRegistration(clientID, modelID string, now time.Time) {
@@ -819,23 +819,6 @@ func (r *ModelRegistry) GetModelCount(modelID string) int {
 		return result
 	}
 	return 0
-}
-
-// GetModelProviders returns provider identifiers that currently supply the given model
-// Parameters:
-//   - modelID: The model ID to check
-//
-// Returns:
-//   - []string: Provider identifiers ordered by availability count (descending)
-func (r *ModelRegistry) GetModelProviders(modelID string) []string {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-
-	registration, exists := r.models[modelID]
-	if !exists || registration == nil || registration.Count <= 0 {
-		return nil
-	}
-	return []string{constant.Codex}
 }
 
 // GetModelInfo returns ModelInfo for the registered Codex model.

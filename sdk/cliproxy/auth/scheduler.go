@@ -31,15 +31,15 @@ const (
 	scheduledStateDisabled
 )
 
-// authScheduler keeps the incremental provider/model scheduling state used by Manager.
+// authScheduler keeps the incremental model scheduling state used by Manager.
 type authScheduler struct {
 	mu       sync.Mutex
 	strategy schedulerStrategy
-	state    *providerScheduler
+	state    *authPoolState
 }
 
-// providerScheduler stores auth metadata and model shards for the Codex pool.
-type providerScheduler struct {
+// authPoolState stores auth metadata and model shards for the Codex pool.
+type authPoolState struct {
 	auths       map[string]*scheduledAuthMeta
 	modelShards map[string]*modelScheduler
 }
@@ -52,7 +52,7 @@ type scheduledAuthMeta struct {
 	supportedModelSet map[string]struct{}
 }
 
-// modelScheduler tracks ready and blocked auths for one provider/model combination.
+// modelScheduler tracks ready and blocked auths for one model shard.
 type modelScheduler struct {
 	modelKey        string
 	entries         map[string]*scheduledAuth
@@ -88,7 +88,7 @@ type cooldownQueue []*scheduledAuth
 func newAuthScheduler(selector Selector) *authScheduler {
 	return &authScheduler{
 		strategy: selectorStrategy(selector),
-		state: &providerScheduler{
+		state: &authPoolState{
 			auths:       make(map[string]*scheduledAuthMeta),
 			modelShards: make(map[string]*modelScheduler),
 		},
@@ -124,7 +124,7 @@ func (s *authScheduler) rebuild(auths []*Auth) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.state = &providerScheduler{
+	s.state = &authPoolState{
 		auths:       make(map[string]*scheduledAuthMeta),
 		modelShards: make(map[string]*modelScheduler),
 	}
@@ -158,16 +158,9 @@ func (s *authScheduler) removeAuth(authID string) {
 	s.removeAuthLocked(authID)
 }
 
-// pickSingle returns the next auth for a single provider/model request using scheduler state.
-func (s *authScheduler) pickSingle(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, tried map[string]struct{}) (*Auth, error) {
+// pickSingle returns the next auth for a single model request using scheduler state.
+func (s *authScheduler) pickSingle(ctx context.Context, model string, opts cliproxyexecutor.Options, tried map[string]struct{}) (*Auth, error) {
 	if s == nil {
-		return nil, &Error{Code: "auth_not_found", Message: "no auth available"}
-	}
-	providerKey := strings.ToLower(strings.TrimSpace(provider))
-	if providerKey == "" {
-		providerKey = constant.Codex
-	}
-	if providerKey != constant.Codex {
 		return nil, &Error{Code: "auth_not_found", Message: "no auth available"}
 	}
 	modelKey := canonicalModelKey(model)
@@ -176,11 +169,11 @@ func (s *authScheduler) pickSingle(ctx context.Context, provider, model string, 
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	providerState := s.ensureStateLocked()
-	if providerState == nil {
+	pool := s.ensureStateLocked()
+	if pool == nil {
 		return nil, &Error{Code: "auth_not_found", Message: "no auth available"}
 	}
-	shard := providerState.ensureModelLocked(modelKey, time.Now())
+	shard := pool.ensureModelLocked(modelKey, time.Now())
 	if shard == nil {
 		return nil, &Error{Code: "auth_not_found", Message: "no auth available"}
 	}
@@ -201,7 +194,7 @@ func (s *authScheduler) pickSingle(ctx context.Context, provider, model string, 
 	if picked := shard.pickReadyLocked(preferWebsocket, s.strategy, predicate); picked != nil {
 		return picked, nil
 	}
-	return nil, shard.unavailableErrorLocked(provider, model, predicate)
+	return nil, shard.unavailableErrorLocked(model, predicate)
 }
 
 // triedPredicate builds a filter that excludes auths already attempted for the current request.
@@ -224,8 +217,8 @@ func (s *authScheduler) upsertAuthLocked(auth *Auth, now time.Time) {
 		return
 	}
 	authID := strings.TrimSpace(auth.ID)
-	providerKey := strings.ToLower(strings.TrimSpace(auth.Provider))
-	if authID == "" || providerKey != constant.Codex || auth.Disabled {
+	authProvider := strings.ToLower(strings.TrimSpace(auth.Provider))
+	if authID == "" || authProvider != constant.Codex || auth.Disabled {
 		s.removeAuthLocked(authID)
 		return
 	}
@@ -247,10 +240,10 @@ func (s *authScheduler) removeAuthLocked(authID string) {
 	}
 }
 
-// ensureStateLocked returns the Codex scheduler state, creating it on demand.
-func (s *authScheduler) ensureStateLocked() *providerScheduler {
+// ensureStateLocked returns the Codex auth pool state, creating it on demand.
+func (s *authScheduler) ensureStateLocked() *authPoolState {
 	if s.state == nil {
-		s.state = &providerScheduler{
+		s.state = &authPoolState{
 			auths:       make(map[string]*scheduledAuthMeta),
 			modelShards: make(map[string]*modelScheduler),
 		}
@@ -296,7 +289,7 @@ func supportedModelSetForAuth(authID string) map[string]struct{} {
 }
 
 // upsertAuthLocked updates every existing model shard that can reference the auth metadata.
-func (p *providerScheduler) upsertAuthLocked(meta *scheduledAuthMeta, now time.Time) {
+func (p *authPoolState) upsertAuthLocked(meta *scheduledAuthMeta, now time.Time) {
 	if p == nil || meta == nil || meta.auth == nil {
 		return
 	}
@@ -313,8 +306,8 @@ func (p *providerScheduler) upsertAuthLocked(meta *scheduledAuthMeta, now time.T
 	}
 }
 
-// removeAuthLocked removes an auth from all model shards owned by the provider scheduler.
-func (p *providerScheduler) removeAuthLocked(authID string) {
+// removeAuthLocked removes an auth from all model shards owned by the auth pool.
+func (p *authPoolState) removeAuthLocked(authID string) {
 	if p == nil || authID == "" {
 		return
 	}
@@ -326,8 +319,8 @@ func (p *providerScheduler) removeAuthLocked(authID string) {
 	}
 }
 
-// ensureModelLocked returns the shard for modelKey, building it lazily from provider auths.
-func (p *providerScheduler) ensureModelLocked(modelKey string, now time.Time) *modelScheduler {
+// ensureModelLocked returns the shard for modelKey, building it lazily from pooled auths.
+func (p *authPoolState) ensureModelLocked(modelKey string, now time.Time) *modelScheduler {
 	if p == nil {
 		return nil
 	}
@@ -515,7 +508,7 @@ func (m *modelScheduler) pickReadyAtPriorityLocked(preferWebsocket bool, priorit
 }
 
 // unavailableErrorLocked returns the correct unavailable or cooldown error for the shard.
-func (m *modelScheduler) unavailableErrorLocked(provider, model string, predicate func(*scheduledAuth) bool) error {
+func (m *modelScheduler) unavailableErrorLocked(model string, predicate func(*scheduledAuth) bool) error {
 	now := time.Now()
 	total, cooldownCount, earliest := m.availabilitySummaryLocked(predicate)
 	if total == 0 {
@@ -526,7 +519,7 @@ func (m *modelScheduler) unavailableErrorLocked(provider, model string, predicat
 		if resetIn < 0 {
 			resetIn = 0
 		}
-		return newModelCooldownError(model, provider, resetIn)
+		return newModelCooldownError(model, resetIn)
 	}
 	return &Error{Code: "auth_unavailable", Message: "no auth available"}
 }

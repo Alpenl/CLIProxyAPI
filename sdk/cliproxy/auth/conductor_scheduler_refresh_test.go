@@ -79,7 +79,7 @@ func TestManager_RefreshSchedulerEntry_RebuildsSupportedModelSetAfterModelRegist
 
 			registerSchedulerModels(t, "scheduler-refresh-model", auth.ID)
 
-			got, errPick := manager.scheduler.pickSingle(ctx, "codex", "scheduler-refresh-model", cliproxyexecutor.Options{}, nil)
+			got, errPick := manager.scheduler.pickSingle(ctx, "scheduler-refresh-model", cliproxyexecutor.Options{}, nil)
 			var authErr *Error
 			if !errors.As(errPick, &authErr) || authErr == nil {
 				t.Fatalf("pickSingle() before refresh error = %v, want auth_not_found", errPick)
@@ -93,7 +93,7 @@ func TestManager_RefreshSchedulerEntry_RebuildsSupportedModelSetAfterModelRegist
 
 			manager.RefreshSchedulerEntry(auth.ID)
 
-			got, errPick = manager.scheduler.pickSingle(ctx, "codex", "scheduler-refresh-model", cliproxyexecutor.Options{}, nil)
+			got, errPick = manager.scheduler.pickSingle(ctx, "scheduler-refresh-model", cliproxyexecutor.Options{}, nil)
 			if errPick != nil {
 				t.Fatalf("pickSingle() after refresh error = %v", errPick)
 			}
@@ -121,7 +121,6 @@ func TestManager_PickNext_RebuildsSchedulerAfterModelCooldownError(t *testing.T)
 
 	manager.MarkResult(ctx, Result{
 		AuthID:   oldAuth.ID,
-		Provider: "codex",
 		Model:    "scheduler-cooldown-rebuild-model",
 		Success:  false,
 		Error:    &Error{HTTPStatus: http.StatusTooManyRequests, Message: "quota"},
@@ -141,7 +140,7 @@ func TestManager_PickNext_RebuildsSchedulerAfterModelCooldownError(t *testing.T)
 		reg.UnregisterClient(newAuth.ID)
 	})
 
-	got, errPick := manager.scheduler.pickSingle(ctx, "codex", "scheduler-cooldown-rebuild-model", cliproxyexecutor.Options{}, nil)
+	got, errPick := manager.scheduler.pickSingle(ctx, "scheduler-cooldown-rebuild-model", cliproxyexecutor.Options{}, nil)
 	var cooldownErr *modelCooldownError
 	if !errors.As(errPick, &cooldownErr) {
 		t.Fatalf("pickSingle() before sync error = %v, want modelCooldownError", errPick)
@@ -150,7 +149,7 @@ func TestManager_PickNext_RebuildsSchedulerAfterModelCooldownError(t *testing.T)
 		t.Fatalf("pickSingle() before sync auth = %v, want nil", got)
 	}
 
-	got, executor, errPick := manager.pickNext(ctx, "codex", "scheduler-cooldown-rebuild-model", cliproxyexecutor.Options{}, nil)
+	got, executor, errPick := manager.pickNext(ctx, "scheduler-cooldown-rebuild-model", cliproxyexecutor.Options{}, nil)
 	if errPick != nil {
 		t.Fatalf("pickNext() error = %v", errPick)
 	}

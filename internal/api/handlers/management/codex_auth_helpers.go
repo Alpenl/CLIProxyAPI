@@ -286,11 +286,11 @@ func (h *Handler) registerAuthFromFile(ctx context.Context, path string, data []
 	if err := json.Unmarshal(data, &metadata); err != nil {
 		return fmt.Errorf("invalid auth file: %w", err)
 	}
-	provider, _ := metadata["type"].(string)
-	if provider == "" {
-		provider = "unknown"
+	authType, _ := metadata["type"].(string)
+	if authType == "" {
+		authType = "unknown"
 	}
-	label := provider
+	label := authType
 	if email, ok := metadata["email"].(string); ok && email != "" {
 		label = email
 	}
@@ -306,7 +306,7 @@ func (h *Handler) registerAuthFromFile(ctx context.Context, path string, data []
 	}
 	auth := &coreauth.Auth{
 		ID:         authID,
-		Provider:   provider,
+		Provider:   authType,
 		FileName:   filepath.Base(path),
 		Label:      label,
 		Status:     coreauth.StatusActive,

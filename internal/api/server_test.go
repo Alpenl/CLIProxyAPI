@@ -175,16 +175,12 @@ func TestServerRemovesLegacyRoutes(t *testing.T) {
 		method string
 		path   string
 	}{
-		{name: "claude messages removed", method: http.MethodPost, path: "/v1/messages"},
-		{name: "claude count tokens removed", method: http.MethodPost, path: "/v1/messages/count_tokens"},
-		{name: "gemini beta models removed", method: http.MethodGet, path: "/v1beta/models"},
-		{name: "amp provider route removed", method: http.MethodGet, path: "/api/provider/openai/models"},
-		{name: "anthropic callback removed", method: http.MethodGet, path: "/anthropic/callback"},
-		{name: "google callback removed", method: http.MethodGet, path: "/google/callback"},
-		{name: "iflow callback removed", method: http.MethodGet, path: "/iflow/callback"},
-		{name: "antigravity callback removed", method: http.MethodGet, path: "/antigravity/callback"},
-		{name: "oauth callback relay removed", method: http.MethodPost, path: "/v0/management/oauth-callback"},
-		{name: "qwen auth url removed", method: http.MethodGet, path: "/v0/management/qwen-auth-url"},
+		{name: "legacy messages endpoint removed", method: http.MethodPost, path: "/v1/messages"},
+		{name: "legacy token count endpoint removed", method: http.MethodPost, path: "/v1/messages/count_tokens"},
+		{name: "legacy beta models endpoint removed", method: http.MethodGet, path: "/v1beta/models"},
+		{name: "legacy routed models endpoint removed", method: http.MethodGet, path: "/api/provider/openai/models"},
+		{name: "legacy oauth callback removed", method: http.MethodGet, path: "/anthropic/callback"},
+		{name: "legacy management callback relay removed", method: http.MethodPost, path: "/v0/management/oauth-callback"},
 	}
 
 	for _, tc := range testCases {

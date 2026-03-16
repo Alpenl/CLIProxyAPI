@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Record contains the usage statistics captured for a single provider request.
+// Record contains the usage statistics captured for a single upstream request.
 type Record struct {
 	Provider    string
 	Model       string

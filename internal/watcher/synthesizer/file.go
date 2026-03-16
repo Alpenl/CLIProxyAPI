@@ -75,11 +75,11 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) []
 	if t == "" {
 		return nil
 	}
-	provider := strings.ToLower(t)
-	if provider != "codex" {
+	authType := strings.ToLower(t)
+	if authType != "codex" {
 		return nil
 	}
-	label := provider
+	label := authType
 	if email, _ := metadata["email"].(string); email != "" {
 		label = email
 	}
@@ -119,7 +119,7 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) []
 
 	a := &coreauth.Auth{
 		ID:       id,
-		Provider: provider,
+		Provider: authType,
 		Label:    label,
 		Prefix:   prefix,
 		Status:   status,
@@ -147,7 +147,7 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) []
 	}
 	ApplyAuthExcludedModelsMeta(a, cfg, perAccountExcluded, "oauth")
 	// For codex auth files, extract plan_type from the JWT id_token.
-	if provider == "codex" {
+	if authType == "codex" {
 		if idTokenRaw, ok := metadata["id_token"].(string); ok && strings.TrimSpace(idTokenRaw) != "" {
 			if claims, errParse := codex.ParseJWTToken(idTokenRaw); errParse == nil && claims != nil {
 				if pt := strings.TrimSpace(claims.CodexAuthInfo.ChatgptPlanType); pt != "" {

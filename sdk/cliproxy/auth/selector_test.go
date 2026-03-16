@@ -21,7 +21,7 @@ func TestFillFirstSelectorPick_Deterministic(t *testing.T) {
 		{ID: "c"},
 	}
 
-	got, err := selector.Pick(context.Background(), "codex", "", cliproxyexecutor.Options{}, auths)
+	got, err := selector.Pick(context.Background(), "", cliproxyexecutor.Options{}, auths)
 	if err != nil {
 		t.Fatalf("Pick() error = %v", err)
 	}
@@ -45,7 +45,7 @@ func TestRoundRobinSelectorPick_CyclesDeterministic(t *testing.T) {
 
 	want := []string{"a", "b", "c", "a", "b"}
 	for i, id := range want {
-		got, err := selector.Pick(context.Background(), "codex", "", cliproxyexecutor.Options{}, auths)
+		got, err := selector.Pick(context.Background(), "", cliproxyexecutor.Options{}, auths)
 		if err != nil {
 			t.Fatalf("Pick() #%d error = %v", i, err)
 		}
@@ -70,7 +70,7 @@ func TestRoundRobinSelectorPick_PriorityBuckets(t *testing.T) {
 
 	want := []string{"a", "b", "a", "b"}
 	for i, id := range want {
-		got, err := selector.Pick(context.Background(), "codex", "", cliproxyexecutor.Options{}, auths)
+		got, err := selector.Pick(context.Background(), "", cliproxyexecutor.Options{}, auths)
 		if err != nil {
 			t.Fatalf("Pick() #%d error = %v", i, err)
 		}
@@ -109,7 +109,7 @@ func TestFillFirstSelectorPick_PriorityFallbackCooldown(t *testing.T) {
 	}
 	low := &Auth{ID: "low", Attributes: map[string]string{"priority": "0"}}
 
-	got, err := selector.Pick(context.Background(), "codex", model, cliproxyexecutor.Options{}, []*Auth{high, low})
+	got, err := selector.Pick(context.Background(), model, cliproxyexecutor.Options{}, []*Auth{high, low})
 	if err != nil {
 		t.Fatalf("Pick() error = %v", err)
 	}
@@ -141,7 +141,7 @@ func TestRoundRobinSelectorPick_Concurrent(t *testing.T) {
 			defer wg.Done()
 			<-start
 			for j := 0; j < iterations; j++ {
-				got, err := selector.Pick(context.Background(), "codex", "", cliproxyexecutor.Options{}, auths)
+				got, err := selector.Pick(context.Background(), "", cliproxyexecutor.Options{}, auths)
 				if err != nil {
 					select {
 					case errCh <- err:
@@ -214,11 +214,11 @@ func TestSelectorPick_AllCooldownReturnsModelCooldownError(t *testing.T) {
 		},
 	}
 
-	t.Run("provider includes provider field", func(t *testing.T) {
+	t.Run("error payload omits provider field", func(t *testing.T) {
 		t.Parallel()
 
 		selector := &FillFirstSelector{}
-		_, err := selector.Pick(context.Background(), "codex", model, cliproxyexecutor.Options{}, auths)
+		_, err := selector.Pick(context.Background(), model, cliproxyexecutor.Options{}, auths)
 		if err == nil {
 			t.Fatalf("Pick() error = nil")
 		}
@@ -236,8 +236,8 @@ func TestSelectorPick_AllCooldownReturnsModelCooldownError(t *testing.T) {
 		if !ok {
 			t.Fatalf("Error() payload missing error object: %v", payload)
 		}
-		if got, _ := rawErr["provider"].(string); got != "codex" {
-			t.Fatalf("Error().error.provider = %q, want %q", got, "codex")
+		if _, exists := rawErr["provider"]; exists {
+			t.Fatalf("expected provider field to be omitted, got %v", rawErr["provider"])
 		}
 	})
 }
@@ -300,7 +300,7 @@ func TestFillFirstSelectorPick_ThinkingSuffixFallsBackToBaseModelState(t *testin
 		Attributes: map[string]string{"priority": "0"},
 	}
 
-	got, err := selector.Pick(context.Background(), "codex", requestedModel, cliproxyexecutor.Options{}, []*Auth{high, low})
+	got, err := selector.Pick(context.Background(), requestedModel, cliproxyexecutor.Options{}, []*Auth{high, low})
 	if err != nil {
 		t.Fatalf("Pick() error = %v", err)
 	}
@@ -321,11 +321,11 @@ func TestRoundRobinSelectorPick_ThinkingSuffixSharesCursor(t *testing.T) {
 		{ID: "a"},
 	}
 
-	first, err := selector.Pick(context.Background(), "codex", "test-model(high)", cliproxyexecutor.Options{}, auths)
+	first, err := selector.Pick(context.Background(), "test-model(high)", cliproxyexecutor.Options{}, auths)
 	if err != nil {
 		t.Fatalf("Pick() first error = %v", err)
 	}
-	second, err := selector.Pick(context.Background(), "codex", "test-model(low)", cliproxyexecutor.Options{}, auths)
+	second, err := selector.Pick(context.Background(), "test-model(low)", cliproxyexecutor.Options{}, auths)
 	if err != nil {
 		t.Fatalf("Pick() second error = %v", err)
 	}
@@ -346,9 +346,9 @@ func TestRoundRobinSelectorPick_CursorKeyCap(t *testing.T) {
 	selector := &RoundRobinSelector{maxKeys: 2}
 	auths := []*Auth{{ID: "a"}}
 
-	_, _ = selector.Pick(context.Background(), "codex", "m1", cliproxyexecutor.Options{}, auths)
-	_, _ = selector.Pick(context.Background(), "codex", "m2", cliproxyexecutor.Options{}, auths)
-	_, _ = selector.Pick(context.Background(), "codex", "m3", cliproxyexecutor.Options{}, auths)
+	_, _ = selector.Pick(context.Background(), "m1", cliproxyexecutor.Options{}, auths)
+	_, _ = selector.Pick(context.Background(), "m2", cliproxyexecutor.Options{}, auths)
+	_, _ = selector.Pick(context.Background(), "m3", cliproxyexecutor.Options{}, auths)
 
 	selector.mu.Lock()
 	defer selector.mu.Unlock()
@@ -359,7 +359,7 @@ func TestRoundRobinSelectorPick_CursorKeyCap(t *testing.T) {
 	if len(selector.cursors) != 1 {
 		t.Fatalf("len(selector.cursors) = %d, want %d", len(selector.cursors), 1)
 	}
-	if _, ok := selector.cursors["codex:m3"]; !ok {
-		t.Fatalf("selector.cursors missing key %q", "codex:m3")
+	if _, ok := selector.cursors["m3"]; !ok {
+		t.Fatalf("selector.cursors missing key %q", "m3")
 	}
 }

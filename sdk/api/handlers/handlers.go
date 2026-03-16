@@ -14,7 +14,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
@@ -470,7 +469,7 @@ func appendAPIResponse(c *gin.Context, data []byte) {
 // ExecuteWithAuthManager executes a non-streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, http.Header, *interfaces.ErrorMessage) {
-	provider, normalizedModel, errMsg := h.getRequestDetails(modelName)
+	normalizedModel, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		return nil, nil, errMsg
 	}
@@ -490,7 +489,7 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 		SourceFormat:    sdktranslator.FromString(handlerType),
 	}
 	opts.Metadata = reqMeta
-	resp, err := h.AuthManager.Execute(ctx, provider, req, opts)
+	resp, err := h.AuthManager.Execute(ctx, req, opts)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if se, ok := err.(interface{ StatusCode() int }); ok && se != nil {
@@ -515,7 +514,7 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 // ExecuteCountWithAuthManager executes a non-streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, http.Header, *interfaces.ErrorMessage) {
-	provider, normalizedModel, errMsg := h.getRequestDetails(modelName)
+	normalizedModel, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		return nil, nil, errMsg
 	}
@@ -535,7 +534,7 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 		SourceFormat:    sdktranslator.FromString(handlerType),
 	}
 	opts.Metadata = reqMeta
-	resp, err := h.AuthManager.ExecuteCount(ctx, provider, req, opts)
+	resp, err := h.AuthManager.ExecuteCount(ctx, req, opts)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if se, ok := err.(interface{ StatusCode() int }); ok && se != nil {
@@ -561,7 +560,7 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 // This path is the only supported execution route.
 // The returned http.Header carries upstream response headers captured before streaming begins.
 func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
-	provider, normalizedModel, errMsg := h.getRequestDetails(modelName)
+	normalizedModel, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
 		errChan <- errMsg
@@ -584,7 +583,7 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 		SourceFormat:    sdktranslator.FromString(handlerType),
 	}
 	opts.Metadata = reqMeta
-	streamResult, err := h.AuthManager.ExecuteStream(ctx, provider, req, opts)
+	streamResult, err := h.AuthManager.ExecuteStream(ctx, req, opts)
 	if err != nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
 		status := http.StatusInternalServerError
@@ -687,7 +686,7 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 					if !sentPayload {
 						if bootstrapRetries < maxBootstrapRetries && bootstrapEligible(streamErr) {
 							bootstrapRetries++
-							retryResult, retryErr := h.AuthManager.ExecuteStream(ctx, provider, req, opts)
+							retryResult, retryErr := h.AuthManager.ExecuteStream(ctx, req, opts)
 							if retryErr == nil {
 								if passthroughHeadersEnabled {
 									replaceHeader(upstreamHeaders, FilterUpstreamHeaders(retryResult.Headers))
@@ -790,13 +789,8 @@ func ResolveCodexRequestModel(modelName string) (normalizedModel string, err *in
 	parsed := thinking.ParseSuffix(resolvedModelName)
 	baseModel := strings.TrimSpace(parsed.ModelName)
 
-	hasCodexProvider := modelHasProvider(baseModel, constant.Codex)
-	if !hasCodexProvider && baseModel != resolvedModelName {
-		hasCodexProvider = modelHasProvider(resolvedModelName, constant.Codex)
-	}
-
-	if !hasCodexProvider {
-		return "", &interfaces.ErrorMessage{StatusCode: http.StatusBadGateway, Error: fmt.Errorf("unknown provider for model %s", modelName)}
+	if registry.LookupModelInfo(baseModel) == nil {
+		return "", &interfaces.ErrorMessage{StatusCode: http.StatusBadGateway, Error: fmt.Errorf("unknown codex model %s", modelName)}
 	}
 
 	// The thinking suffix is preserved in the model name itself, so no
@@ -804,26 +798,12 @@ func ResolveCodexRequestModel(modelName string) (normalizedModel string, err *in
 	return resolvedModelName, nil
 }
 
-func modelHasProvider(modelName, provider string) bool {
-	modelName = strings.TrimSpace(modelName)
-	provider = strings.TrimSpace(provider)
-	if modelName == "" || provider == "" {
-		return false
-	}
-	for _, candidate := range registry.GetGlobalRegistry().GetModelProviders(modelName) {
-		if strings.EqualFold(strings.TrimSpace(candidate), provider) {
-			return true
-		}
-	}
-	return false
-}
-
-func (h *BaseAPIHandler) getRequestDetails(modelName string) (provider string, normalizedModel string, err *interfaces.ErrorMessage) {
+func (h *BaseAPIHandler) getRequestDetails(modelName string) (normalizedModel string, err *interfaces.ErrorMessage) {
 	normalizedModel, err = ResolveCodexRequestModel(modelName)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	return constant.Codex, normalizedModel, nil
+	return normalizedModel, nil
 }
 
 func cloneBytes(src []byte) []byte {

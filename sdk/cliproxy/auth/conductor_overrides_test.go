@@ -38,7 +38,7 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 	}
 
 	_, _, maxWait := m.retrySettings()
-	wait, shouldRetry := m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, "codex", model, maxWait)
+	wait, shouldRetry := m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, model, maxWait)
 	if shouldRetry {
 		t.Fatalf("expected shouldRetry=false for request_retry=0, got true (wait=%v)", wait)
 	}
@@ -48,7 +48,7 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 		t.Fatalf("update auth: %v", errUpdate)
 	}
 
-	wait, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, "codex", model, maxWait)
+	wait, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 0, model, maxWait)
 	if !shouldRetry {
 		t.Fatalf("expected shouldRetry=true for request_retry=1, got false")
 	}
@@ -56,7 +56,7 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 		t.Fatalf("expected wait > 0, got %v", wait)
 	}
 
-	_, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 1, "codex", model, maxWait)
+	_, shouldRetry = m.shouldRetryAfterError(&Error{HTTPStatus: 500, Message: "boom"}, 1, model, maxWait)
 	if shouldRetry {
 		t.Fatalf("expected shouldRetry=false on attempt=1 for request_retry=1, got true")
 	}
@@ -149,21 +149,21 @@ func TestManager_MaxRetryCredentials_LimitsCrossCredentialRetries(t *testing.T) 
 		{
 			name: "execute",
 			invoke: func(m *Manager) error {
-				_, errExecute := m.Execute(context.Background(), "codex", request, cliproxyexecutor.Options{})
+				_, errExecute := m.Execute(context.Background(), request, cliproxyexecutor.Options{})
 				return errExecute
 			},
 		},
 		{
 			name: "execute_count",
 			invoke: func(m *Manager) error {
-				_, errExecute := m.ExecuteCount(context.Background(), "codex", request, cliproxyexecutor.Options{})
+				_, errExecute := m.ExecuteCount(context.Background(), request, cliproxyexecutor.Options{})
 				return errExecute
 			},
 		},
 		{
 			name: "execute_stream",
 			invoke: func(m *Manager) error {
-				_, errExecute := m.ExecuteStream(context.Background(), "codex", request, cliproxyexecutor.Options{})
+				_, errExecute := m.ExecuteStream(context.Background(), request, cliproxyexecutor.Options{})
 				return errExecute
 			},
 		},
@@ -212,7 +212,6 @@ func TestManager_MarkResult_RespectsAuthDisableCoolingOverride(t *testing.T) {
 	model := "test-model"
 	m.MarkResult(context.Background(), Result{
 		AuthID:   "auth-1",
-		Provider: "codex",
 		Model:    model,
 		Success:  false,
 		Error:    &Error{HTTPStatus: 500, Message: "boom"},

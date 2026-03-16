@@ -69,7 +69,7 @@ func TestSnapshotCoreAuths_ConfigAndAuthFiles_CodexOnly(t *testing.T) {
 			continue
 		}
 		if auth.Provider != "codex" {
-			t.Fatalf("expected only codex provider, got %s", auth.Provider)
+			t.Fatalf("expected only auth type codex, got %s", auth.Provider)
 		}
 		if auth.Attributes["api_key"] == "codex-key" {
 			seenConfig = true

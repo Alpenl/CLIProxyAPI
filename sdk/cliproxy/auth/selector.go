@@ -38,19 +38,17 @@ const (
 )
 
 type modelCooldownError struct {
-	model    string
-	resetIn  time.Duration
-	provider string
+	model   string
+	resetIn time.Duration
 }
 
-func newModelCooldownError(model, provider string, resetIn time.Duration) *modelCooldownError {
+func newModelCooldownError(model string, resetIn time.Duration) *modelCooldownError {
 	if resetIn < 0 {
 		resetIn = 0
 	}
 	return &modelCooldownError{
-		model:    model,
-		provider: provider,
-		resetIn:  resetIn,
+		model:   model,
+		resetIn: resetIn,
 	}
 }
 
@@ -60,9 +58,6 @@ func (e *modelCooldownError) Error() string {
 		modelName = "requested model"
 	}
 	message := fmt.Sprintf("All credentials for model %s are cooling down", modelName)
-	if e.provider != "" {
-		message = fmt.Sprintf("%s via provider %s", message, e.provider)
-	}
 	resetSeconds := int(math.Ceil(e.resetIn.Seconds()))
 	if resetSeconds < 0 {
 		resetSeconds = 0
@@ -79,9 +74,6 @@ func (e *modelCooldownError) Error() string {
 		"model":         e.model,
 		"reset_time":    displayDuration.String(),
 		"reset_seconds": resetSeconds,
-	}
-	if e.provider != "" {
-		errorBody["provider"] = e.provider
 	}
 	payload := map[string]any{"error": errorBody}
 	data, err := json.Marshal(payload)
@@ -166,14 +158,11 @@ func authWebsocketsEnabled(auth *Auth) bool {
 	return false
 }
 
-func preferCodexWebsocketAuths(ctx context.Context, provider string, available []*Auth) []*Auth {
+func preferWebsocketEnabledAuths(ctx context.Context, available []*Auth) []*Auth {
 	if len(available) == 0 {
 		return available
 	}
 	if !cliproxyexecutor.DownstreamWebsocket(ctx) {
-		return available
-	}
-	if !strings.EqualFold(strings.TrimSpace(provider), "codex") {
 		return available
 	}
 
@@ -210,7 +199,7 @@ func collectAvailableByPriority(auths []*Auth, model string, now time.Time) (ava
 	return available, cooldownCount, earliest
 }
 
-func getAvailableAuths(auths []*Auth, provider, model string, now time.Time) ([]*Auth, error) {
+func getAvailableAuths(auths []*Auth, model string, now time.Time) ([]*Auth, error) {
 	if len(auths) == 0 {
 		return nil, &Error{Code: "auth_not_found", Message: "no auth candidates"}
 	}
@@ -222,7 +211,7 @@ func getAvailableAuths(auths []*Auth, provider, model string, now time.Time) ([]
 			if resetIn < 0 {
 				resetIn = 0
 			}
-			return nil, newModelCooldownError(model, provider, resetIn)
+			return nil, newModelCooldownError(model, resetIn)
 		}
 		return nil, &Error{Code: "auth_unavailable", Message: "no auth available"}
 	}
@@ -243,16 +232,16 @@ func getAvailableAuths(auths []*Auth, provider, model string, now time.Time) ([]
 	return available, nil
 }
 
-// Pick selects the next available auth for the provider in a round-robin manner.
-func (s *RoundRobinSelector) Pick(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
+// Pick selects the next available auth in a round-robin manner.
+func (s *RoundRobinSelector) Pick(ctx context.Context, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
 	_ = opts
 	now := time.Now()
-	available, err := getAvailableAuths(auths, provider, model, now)
+	available, err := getAvailableAuths(auths, model, now)
 	if err != nil {
 		return nil, err
 	}
-	available = preferCodexWebsocketAuths(ctx, provider, available)
-	key := provider + ":" + canonicalModelKey(model)
+	available = preferWebsocketEnabledAuths(ctx, available)
+	key := canonicalModelKey(model)
 	s.mu.Lock()
 	if s.cursors == nil {
 		s.cursors = make(map[string]int)
@@ -279,15 +268,15 @@ func (s *RoundRobinSelector) ensureCursorKey(key string, limit int) {
 	}
 }
 
-// Pick selects the first available auth for the provider in a deterministic manner.
-func (s *FillFirstSelector) Pick(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
+// Pick selects the first available auth in a deterministic manner.
+func (s *FillFirstSelector) Pick(ctx context.Context, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
 	_ = opts
 	now := time.Now()
-	available, err := getAvailableAuths(auths, provider, model, now)
+	available, err := getAvailableAuths(auths, model, now)
 	if err != nil {
 		return nil, err
 	}
-	available = preferCodexWebsocketAuths(ctx, provider, available)
+	available = preferWebsocketEnabledAuths(ctx, available)
 	return available[0], nil
 }
 

@@ -2,7 +2,7 @@
 
 Codex-only proxy and management console.
 
-This branch intentionally removes every non-Codex provider path from the product surface:
+This branch intentionally removes every non-Codex product path from the product surface:
 
 - only Codex OAuth accounts and Codex API keys
 - only OpenAI-compatible `/v1/*` endpoints that route into Codex

@@ -16,7 +16,6 @@ import (
 	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/watcher"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
@@ -62,9 +61,6 @@ type Service struct {
 	// authQueueStop cancels the auth update queue processing.
 	authQueueStop context.CancelFunc
 
-	// authManager handles token lifecycle operations.
-	authManager *sdkAuth.Manager
-
 	// accessManager handles request authentication providers.
 	accessManager *sdkaccess.Manager
 
@@ -82,14 +78,6 @@ type Service struct {
 //   - plugin: The usage plugin to register
 func (s *Service) RegisterUsagePlugin(plugin usage.Plugin) {
 	usage.RegisterPlugin(plugin)
-}
-
-// newDefaultAuthManager creates the default auth manager for Codex token flows.
-func newDefaultAuthManager() *sdkAuth.Manager {
-	return sdkAuth.NewManager(
-		sdkAuth.GetTokenStore(),
-		sdkAuth.NewCodexAuthenticator(),
-	)
 }
 
 func (s *Service) ensureAuthUpdateQueue(ctx context.Context) {
@@ -269,7 +257,7 @@ func (s *Service) ensureExecutorsForAuthWithMode(a *coreauth.Auth, forceReplace 
 	}
 
 	if !forceReplace {
-		existingExecutor, hasExecutor := s.coreManager.Executor("codex")
+		existingExecutor, hasExecutor := s.coreManager.Executor()
 		if hasExecutor {
 			_, isCodexAutoExecutor := existingExecutor.(*executor.CodexAutoExecutor)
 			if isCodexAutoExecutor {
@@ -292,7 +280,7 @@ func (s *Service) registerResolvedModelsForAuth(a *coreauth.Auth, models []*Mode
 	GlobalModelRegistry().RegisterClient(a.ID, models)
 }
 
-// rebindExecutors refreshes provider executors so they observe the latest configuration.
+// rebindExecutors refreshes execution backends so they observe the latest configuration.
 func (s *Service) rebindExecutors() {
 	if s == nil || s.coreManager == nil {
 		return
@@ -351,26 +339,28 @@ func (s *Service) Run(ctx context.Context) error {
 
 	s.server = api.NewServer(s.cfg, s.coreManager, s.accessManager, s.configPath, s.serverOptions...)
 
-	if s.authManager == nil {
-		s.authManager = newDefaultAuthManager()
-	}
-
 	if s.hooks.OnBeforeStart != nil {
 		s.hooks.OnBeforeStart(s.cfg)
 	}
 
 	// Register callback for startup and periodic model catalog refresh.
-	// When remote model definitions change, re-register models for affected providers.
+	// When the Codex catalog changes, rebuild auth registrations from the latest
+	// model snapshot instead of preserving previous suppression state.
 	// This intentionally rebuilds per-auth model availability from the latest catalog
 	// snapshot instead of preserving prior registry suppression state.
 	registry.SetModelRefreshCallback(func(changedProviders []string) {
 		if s == nil || s.coreManager == nil || len(changedProviders) == 0 {
 			return
 		}
-
-		providerSet := make(map[string]bool, len(changedProviders))
-		for _, p := range changedProviders {
-			providerSet[strings.ToLower(strings.TrimSpace(p))] = true
+		changed := false
+		for _, provider := range changedProviders {
+			if strings.EqualFold(strings.TrimSpace(provider), "codex") {
+				changed = true
+				break
+			}
+		}
+		if !changed {
+			return
 		}
 
 		auths := s.coreManager.List()
@@ -383,17 +373,13 @@ func (s *Service) Run(ctx context.Context) error {
 			if !ok || auth == nil || auth.Disabled {
 				continue
 			}
-			provider := strings.ToLower(strings.TrimSpace(auth.Provider))
-			if !providerSet[provider] {
-				continue
-			}
 			if s.refreshModelRegistrationForAuth(auth) {
 				refreshed++
 			}
 		}
 
 		if refreshed > 0 {
-			log.Infof("re-registered models for %d auth(s) due to model catalog changes: %v", refreshed, changedProviders)
+			log.Infof("re-registered models for %d auth(s) after Codex model catalog refresh", refreshed)
 		}
 	})
 
@@ -597,8 +583,8 @@ func (s *Service) registerModelsForAuth(a *coreauth.Auth) {
 			}
 		}
 	}
-	provider := strings.ToLower(strings.TrimSpace(a.Provider))
-	if provider != "codex" {
+	authType := strings.ToLower(strings.TrimSpace(a.Provider))
+	if authType != "codex" {
 		GlobalModelRegistry().UnregisterClient(a.ID)
 		return
 	}
@@ -645,7 +631,7 @@ func (s *Service) registerModelsForAuth(a *coreauth.Auth) {
 
 // refreshModelRegistrationForAuth re-applies the latest model registration for
 // one auth and reconciles any concurrent auth changes that race with the
-// refresh. Callers are expected to pre-filter provider membership.
+// refresh.
 //
 // Re-registration is deliberate: registry cooldown/suspension state is treated
 // as part of the previous registration snapshot and is cleared when the auth is
@@ -676,8 +662,8 @@ func (s *Service) refreshModelRegistrationForAuth(current *coreauth.Auth) bool {
 	return true
 }
 
-// latestAuthForModelRegistration returns the latest auth snapshot regardless of
-// provider membership. Callers use this after a registration attempt to restore
+// latestAuthForModelRegistration returns the latest auth snapshot. Callers use
+// this after a registration attempt to restore
 // whichever state currently owns the client ID in the global registry.
 func (s *Service) latestAuthForModelRegistration(authID string) (*coreauth.Auth, bool) {
 	if s == nil || s.coreManager == nil || authID == "" {

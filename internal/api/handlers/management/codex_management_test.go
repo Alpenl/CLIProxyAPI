@@ -148,7 +148,7 @@ func TestCodexManagementImportDirectory_ImportsValidCodexFiles(t *testing.T) {
 		t.Fatalf("expected 1 registered auth, got %d", len(auths))
 	}
 	if got := auths[0].Provider; got != "codex" {
-		t.Fatalf("expected registered provider codex, got %s", got)
+		t.Fatalf("expected registered auth type codex, got %s", got)
 	}
 }
 

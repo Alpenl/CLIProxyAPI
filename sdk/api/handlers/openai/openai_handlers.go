@@ -91,7 +91,7 @@ func (h *OpenAIAPIHandler) OpenAIModels(c *gin.Context) {
 
 // ChatCompletions handles the /v1/chat/completions endpoint.
 // It determines whether the request is for a streaming or non-streaming response
-// and calls the appropriate handler based on the model provider.
+// and routes it through the matching OpenAI-compatible handler path.
 //
 // Parameters:
 //   - c: The Gin context containing the HTTP request and response
@@ -145,7 +145,7 @@ func shouldTreatAsResponsesFormat(rawJSON []byte) bool {
 
 // Completions handles the /v1/completions endpoint.
 // It determines whether the request is for a streaming or non-streaming response
-// and calls the appropriate handler based on the model provider.
+// and routes it through the matching OpenAI-compatible handler path.
 // This endpoint follows the OpenAI completions API specification.
 //
 // Parameters:

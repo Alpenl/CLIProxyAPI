@@ -19,13 +19,13 @@ func TestEnsureExecutorsForAuth_CodexDoesNotReplaceInNormalMode(t *testing.T) {
 	}
 
 	service.ensureExecutorsForAuth(auth)
-	firstExecutor, okFirst := service.coreManager.Executor("codex")
+	firstExecutor, okFirst := service.coreManager.Executor()
 	if !okFirst || firstExecutor == nil {
 		t.Fatal("expected codex executor after first bind")
 	}
 
 	service.ensureExecutorsForAuth(auth)
-	secondExecutor, okSecond := service.coreManager.Executor("codex")
+	secondExecutor, okSecond := service.coreManager.Executor()
 	if !okSecond || secondExecutor == nil {
 		t.Fatal("expected codex executor after second bind")
 	}
@@ -47,13 +47,13 @@ func TestEnsureExecutorsForAuthWithMode_CodexForceReplace(t *testing.T) {
 	}
 
 	service.ensureExecutorsForAuth(auth)
-	firstExecutor, okFirst := service.coreManager.Executor("codex")
+	firstExecutor, okFirst := service.coreManager.Executor()
 	if !okFirst || firstExecutor == nil {
 		t.Fatal("expected codex executor after first bind")
 	}
 
 	service.ensureExecutorsForAuthWithMode(auth, true)
-	secondExecutor, okSecond := service.coreManager.Executor("codex")
+	secondExecutor, okSecond := service.coreManager.Executor()
 	if !okSecond || secondExecutor == nil {
 		t.Fatal("expected codex executor after forced rebind")
 	}
@@ -76,10 +76,7 @@ func TestEnsureExecutorsForAuth_IgnoresNonCodexProvider(t *testing.T) {
 
 	service.ensureExecutorsForAuth(auth)
 
-	if _, ok := service.coreManager.Executor("other"); ok {
-		t.Fatal("expected non-codex provider executor to remain unregistered")
-	}
-	if _, ok := service.coreManager.Executor("codex"); ok {
+	if _, ok := service.coreManager.Executor(); ok {
 		t.Fatal("expected no codex executor to be registered for non-codex auth")
 	}
 }

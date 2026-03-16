@@ -40,7 +40,7 @@ func benchmarkManagerSetup(b *testing.B, total int, withPriority bool) (*Manager
 	b.Helper()
 	manager := NewManager(nil, &RoundRobinSelector{}, nil)
 	const provider = "codex"
-	manager.executors[provider] = schedulerBenchmarkExecutor{id: provider}
+	manager.executor = schedulerBenchmarkExecutor{id: provider}
 
 	reg := registry.GetGlobalRegistry()
 	model := "bench-model"
@@ -74,14 +74,14 @@ func BenchmarkManagerPickNext500(b *testing.B) {
 	ctx := context.Background()
 	opts := cliproxyexecutor.Options{}
 	tried := map[string]struct{}{}
-	if _, _, errWarm := manager.pickNext(ctx, "codex", model, opts, tried); errWarm != nil {
+	if _, _, errWarm := manager.pickNext(ctx, model, opts, tried); errWarm != nil {
 		b.Fatalf("warmup pickNext error = %v", errWarm)
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		auth, exec, errPick := manager.pickNext(ctx, "codex", model, opts, tried)
+		auth, exec, errPick := manager.pickNext(ctx, model, opts, tried)
 		if errPick != nil || auth == nil || exec == nil {
 			b.Fatalf("pickNext failed: auth=%v exec=%v err=%v", auth, exec, errPick)
 		}
@@ -93,14 +93,14 @@ func BenchmarkManagerPickNext1000(b *testing.B) {
 	ctx := context.Background()
 	opts := cliproxyexecutor.Options{}
 	tried := map[string]struct{}{}
-	if _, _, errWarm := manager.pickNext(ctx, "codex", model, opts, tried); errWarm != nil {
+	if _, _, errWarm := manager.pickNext(ctx, model, opts, tried); errWarm != nil {
 		b.Fatalf("warmup pickNext error = %v", errWarm)
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		auth, exec, errPick := manager.pickNext(ctx, "codex", model, opts, tried)
+		auth, exec, errPick := manager.pickNext(ctx, model, opts, tried)
 		if errPick != nil || auth == nil || exec == nil {
 			b.Fatalf("pickNext failed: auth=%v exec=%v err=%v", auth, exec, errPick)
 		}
@@ -112,14 +112,14 @@ func BenchmarkManagerPickNextPriority500(b *testing.B) {
 	ctx := context.Background()
 	opts := cliproxyexecutor.Options{}
 	tried := map[string]struct{}{}
-	if _, _, errWarm := manager.pickNext(ctx, "codex", model, opts, tried); errWarm != nil {
+	if _, _, errWarm := manager.pickNext(ctx, model, opts, tried); errWarm != nil {
 		b.Fatalf("warmup pickNext error = %v", errWarm)
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		auth, exec, errPick := manager.pickNext(ctx, "codex", model, opts, tried)
+		auth, exec, errPick := manager.pickNext(ctx, model, opts, tried)
 		if errPick != nil || auth == nil || exec == nil {
 			b.Fatalf("pickNext failed: auth=%v exec=%v err=%v", auth, exec, errPick)
 		}
@@ -131,14 +131,14 @@ func BenchmarkManagerPickNextPriority1000(b *testing.B) {
 	ctx := context.Background()
 	opts := cliproxyexecutor.Options{}
 	tried := map[string]struct{}{}
-	if _, _, errWarm := manager.pickNext(ctx, "codex", model, opts, tried); errWarm != nil {
+	if _, _, errWarm := manager.pickNext(ctx, model, opts, tried); errWarm != nil {
 		b.Fatalf("warmup pickNext error = %v", errWarm)
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		auth, exec, errPick := manager.pickNext(ctx, "codex", model, opts, tried)
+		auth, exec, errPick := manager.pickNext(ctx, model, opts, tried)
 		if errPick != nil || auth == nil || exec == nil {
 			b.Fatalf("pickNext failed: auth=%v exec=%v err=%v", auth, exec, errPick)
 		}
@@ -150,17 +150,17 @@ func BenchmarkManagerPickNextAndMarkResult1000(b *testing.B) {
 	ctx := context.Background()
 	opts := cliproxyexecutor.Options{}
 	tried := map[string]struct{}{}
-	if _, _, errWarm := manager.pickNext(ctx, "codex", model, opts, tried); errWarm != nil {
+	if _, _, errWarm := manager.pickNext(ctx, model, opts, tried); errWarm != nil {
 		b.Fatalf("warmup pickNext error = %v", errWarm)
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		auth, _, errPick := manager.pickNext(ctx, "codex", model, opts, tried)
+		auth, _, errPick := manager.pickNext(ctx, model, opts, tried)
 		if errPick != nil || auth == nil {
 			b.Fatalf("pickNext failed: auth=%v err=%v", auth, errPick)
 		}
-		manager.MarkResult(ctx, Result{AuthID: auth.ID, Provider: "codex", Model: model, Success: true})
+		manager.MarkResult(ctx, Result{AuthID: auth.ID, Model: model, Success: true})
 	}
 }

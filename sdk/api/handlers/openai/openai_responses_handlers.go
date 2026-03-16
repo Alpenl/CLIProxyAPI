@@ -65,7 +65,7 @@ func (h *OpenAIResponsesAPIHandler) OpenAIResponsesModels(c *gin.Context) {
 
 // Responses handles the /v1/responses endpoint.
 // It determines whether the request is for a streaming or non-streaming response
-// and calls the appropriate handler based on the model provider.
+// and routes it through the matching OpenAI-compatible handler path.
 //
 // Parameters:
 //   - c: The Gin context containing the HTTP request and response

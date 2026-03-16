@@ -90,7 +90,7 @@ func ApplyThinking(body []byte, model string, fromFormat string, toFormat string
 		log.WithFields(log.Fields{
 			"provider": providerFormat,
 			"model":    model,
-		}).Debug("thinking: unknown provider, passthrough |")
+		}).Debug("thinking: unknown target format, passthrough |")
 		return body, nil
 	}
 
@@ -264,7 +264,7 @@ func applyUserDefinedModel(body []byte, modelInfo *registry.ModelInfo, fromForma
 		log.WithFields(log.Fields{
 			"model":    modelID,
 			"provider": toFormat,
-		}).Debug("thinking: user-defined model, passthrough (unknown provider) |")
+		}).Debug("thinking: user-defined model, passthrough (unknown target format) |")
 		return body, nil
 	}
 

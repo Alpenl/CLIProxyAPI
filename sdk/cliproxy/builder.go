@@ -30,9 +30,6 @@ type Builder struct {
 	// hooks provides lifecycle callbacks.
 	hooks Hooks
 
-	// authManager handles token lifecycle operations.
-	authManager *sdkAuth.Manager
-
 	// accessManager handles request authentication providers.
 	accessManager *sdkaccess.Manager
 
@@ -101,12 +98,6 @@ func (b *Builder) WithHooks(h Hooks) *Builder {
 	return b
 }
 
-// WithAuthManager overrides the authentication manager used for token lifecycle operations.
-func (b *Builder) WithAuthManager(mgr *sdkAuth.Manager) *Builder {
-	b.authManager = mgr
-	return b
-}
-
 // WithRequestAccessManager overrides the request authentication manager.
 func (b *Builder) WithRequestAccessManager(mgr *sdkaccess.Manager) *Builder {
 	b.accessManager = mgr
@@ -158,11 +149,6 @@ func (b *Builder) Build() (*Service, error) {
 		watcherFactory = defaultWatcherFactory
 	}
 
-	authManager := b.authManager
-	if authManager == nil {
-		authManager = newDefaultAuthManager()
-	}
-
 	accessManager := b.accessManager
 	if accessManager == nil {
 		accessManager = sdkaccess.NewManager()
@@ -201,7 +187,6 @@ func (b *Builder) Build() (*Service, error) {
 		configPath:     b.configPath,
 		watcherFactory: watcherFactory,
 		hooks:          b.hooks,
-		authManager:    authManager,
 		accessManager:  accessManager,
 		coreManager:    coreManager,
 		serverOptions:  append([]api.ServerOption(nil), b.serverOptions...),

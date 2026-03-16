@@ -18,15 +18,15 @@ const (
 	ExecutionSessionMetadataKey = "execution_session_id"
 )
 
-// Request encapsulates the translated payload that will be sent to a provider executor.
+// Request encapsulates the translated payload that will be sent to a Codex execution backend.
 type Request struct {
 	// Model is the upstream model identifier after translation.
 	Model string
-	// Payload is the provider specific JSON payload.
+	// Payload is the backend-specific JSON payload.
 	Payload []byte
-	// Format represents the provider payload schema.
+	// Format represents the backend payload schema.
 	Format sdktranslator.Format
-	// Metadata carries optional provider specific execution hints.
+	// Metadata carries optional backend-specific execution hints.
 	Metadata map[string]any
 }
 
@@ -36,7 +36,7 @@ type Options struct {
 	Stream bool
 	// Alt carries optional alternate format hint (e.g. SSE JSON key).
 	Alt string
-	// Headers are forwarded to the provider request builder.
+	// Headers are forwarded to the upstream request builder.
 	Headers http.Header
 	// Query contains optional query string parameters.
 	Query url.Values
@@ -48,9 +48,9 @@ type Options struct {
 	Metadata map[string]any
 }
 
-// Response wraps either a full provider response or metadata for streaming flows.
+// Response wraps either a full upstream response or metadata for streaming flows.
 type Response struct {
-	// Payload is the provider response in the executor format.
+	// Payload is the upstream response in the executor format.
 	Payload []byte
 	// Metadata exposes optional structured data for translators.
 	Metadata map[string]any
@@ -58,9 +58,9 @@ type Response struct {
 	Headers http.Header
 }
 
-// StreamChunk represents a single streaming payload unit emitted by provider executors.
+// StreamChunk represents a single streaming payload unit emitted by execution backends.
 type StreamChunk struct {
-	// Payload is the raw provider chunk payload.
+	// Payload is the raw upstream chunk payload.
 	Payload []byte
 	// Err reports any terminal error encountered while producing chunks.
 	Err error
@@ -76,7 +76,7 @@ type StreamResult struct {
 }
 
 // StatusError represents an error that carries an HTTP-like status code.
-// Provider executors should implement this when possible to enable
+// Execution backends should implement this when possible to enable
 // better auth state updates on failures (e.g., 401/402/429).
 type StatusError interface {
 	error

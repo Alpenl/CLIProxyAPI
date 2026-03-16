@@ -85,7 +85,7 @@ func TestManagerExecutorReturnsRegisteredExecutor(t *testing.T) {
 	current := &replaceAwareExecutor{id: "codex"}
 	manager.RegisterExecutor(current)
 
-	resolved, okResolved := manager.Executor("CODEX")
+	resolved, okResolved := manager.Executor()
 	if !okResolved {
 		t.Fatal("expected registered executor to be found")
 	}
@@ -97,8 +97,9 @@ func TestManagerExecutorReturnsRegisteredExecutor(t *testing.T) {
 		t.Fatal("expected resolved executor to match registered executor")
 	}
 
-	_, okMissing := manager.Executor("unknown")
+	manager.UnregisterExecutor()
+	_, okMissing := manager.Executor()
 	if okMissing {
-		t.Fatal("expected unknown provider lookup to fail")
+		t.Fatal("expected executor lookup to fail after unregister")
 	}
 }

@@ -41,7 +41,7 @@ func TestFileSynthesizer_Synthesize_CodexFile(t *testing.T) {
 
 	auth := auths[0]
 	if auth.Provider != "codex" {
-		t.Fatalf("expected codex provider, got %s", auth.Provider)
+		t.Fatalf("expected auth type codex, got %s", auth.Provider)
 	}
 	if auth.Label != "codex@example.com" {
 		t.Fatalf("expected email label, got %s", auth.Label)
@@ -63,13 +63,13 @@ func TestFileSynthesizer_Synthesize_CodexFile(t *testing.T) {
 func TestFileSynthesizer_Synthesize_CodexOnlyIgnoresNonCodexAuthFiles(t *testing.T) {
 	authDir := t.TempDir()
 	files := map[string]map[string]any{
-		"legacy-a-auth.json": {
-			"type":  "legacy-a",
-			"email": "legacy-a@example.com",
+		"other-a-auth.json": {
+			"type":  "other-a",
+			"email": "other-a@example.com",
 		},
-		"legacy-b-auth.json": {
-			"type":  "legacy-b",
-			"email": "legacy-b@example.com",
+		"other-b-auth.json": {
+			"type":  "other-b",
+			"email": "other-b@example.com",
 		},
 		"codex-auth.json": {
 			"type":  "codex",
@@ -99,6 +99,6 @@ func TestFileSynthesizer_Synthesize_CodexOnlyIgnoresNonCodexAuthFiles(t *testing
 		t.Fatalf("expected only 1 codex auth, got %d", len(auths))
 	}
 	if auths[0].Provider != "codex" {
-		t.Fatalf("expected codex provider, got %s", auths[0].Provider)
+		t.Fatalf("expected auth type codex, got %s", auths[0].Provider)
 	}
 }
