@@ -150,12 +150,7 @@ func captureRequestInfo(c *gin.Context, captureBody bool) (*RequestInfo, error) 
 }
 
 // shouldLogRequest determines whether the request should be logged.
-// It skips management endpoints to avoid leaking secrets and ignores
-// the removed legacy /api surface entirely.
+// The slimmed proxy only persists request logs for Codex API traffic under /v1.
 func shouldLogRequest(path string) bool {
-	if strings.HasPrefix(path, "/v0/management") || strings.HasPrefix(path, "/management") {
-		return false
-	}
-
-	return !strings.HasPrefix(path, "/api")
+	return strings.HasPrefix(path, "/v1")
 }

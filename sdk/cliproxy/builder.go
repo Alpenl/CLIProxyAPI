@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	configaccess "github.com/router-for-me/CLIProxyAPI/v6/internal/access/config_access"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
@@ -29,9 +27,6 @@ type Builder struct {
 
 	// hooks provides lifecycle callbacks.
 	hooks Hooks
-
-	// accessManager handles request access checks.
-	accessManager *sdkaccess.Manager
 
 	// coreManager handles core authentication and execution.
 	coreManager *coreauth.Manager
@@ -98,12 +93,6 @@ func (b *Builder) WithHooks(h Hooks) *Builder {
 	return b
 }
 
-// WithRequestAccessManager overrides the request authentication manager.
-func (b *Builder) WithRequestAccessManager(mgr *sdkaccess.Manager) *Builder {
-	b.accessManager = mgr
-	return b
-}
-
 // WithCoreAuthManager overrides the runtime auth manager responsible for request execution.
 func (b *Builder) WithCoreAuthManager(mgr *coreauth.Manager) *Builder {
 	b.coreManager = mgr
@@ -149,14 +138,6 @@ func (b *Builder) Build() (*Service, error) {
 		watcherFactory = defaultWatcherFactory
 	}
 
-	accessManager := b.accessManager
-	if accessManager == nil {
-		accessManager = sdkaccess.NewManager()
-	}
-
-	configaccess.Register(&b.cfg.SDKConfig)
-	accessManager.SetProviders(sdkaccess.RegisteredProviders())
-
 	coreManager := b.coreManager
 	if coreManager == nil {
 		tokenStore := sdkAuth.GetTokenStore()
@@ -187,7 +168,6 @@ func (b *Builder) Build() (*Service, error) {
 		configPath:     b.configPath,
 		watcherFactory: watcherFactory,
 		hooks:          b.hooks,
-		accessManager:  accessManager,
 		coreManager:    coreManager,
 		serverOptions:  append([]api.ServerOption(nil), b.serverOptions...),
 	}

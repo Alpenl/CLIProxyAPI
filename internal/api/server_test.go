@@ -14,7 +14,6 @@ import (
 	gin "github.com/gin-gonic/gin"
 	proxyconfig "github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	internallogging "github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 )
@@ -45,10 +44,9 @@ func newTestServer(t *testing.T) *Server {
 	}
 
 	authManager := auth.NewManager(nil, nil, nil)
-	accessManager := sdkaccess.NewManager()
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
-	return NewServer(cfg, authManager, accessManager, configPath)
+	return NewServer(cfg, authManager, configPath)
 }
 
 func TestServerRegistersOnlyCodexRoutes(t *testing.T) {
@@ -241,11 +239,13 @@ func TestDefaultRequestLoggerFactory_UsesResolvedLogDirectory(t *testing.T) {
 		ErrorLogsMaxFiles: 10,
 	}
 
-	logger := defaultRequestLoggerFactory(cfg, configPath)
-	fileLogger, ok := logger.(*internallogging.FileRequestLogger)
-	if !ok {
-		t.Fatalf("expected *FileRequestLogger, got %T", logger)
-	}
+	logger := internallogging.NewFileRequestLogger(
+		cfg.RequestLog,
+		internallogging.ResolveLogDirectory(cfg),
+		filepath.Dir(configPath),
+		cfg.ErrorLogsMaxFiles,
+	)
+	fileLogger := logger
 
 	errLog := fileLogger.LogRequestWithOptions(
 		"/v1/chat/completions",

@@ -15,7 +15,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/runtime/executor"
 	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/watcher"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
@@ -60,9 +59,6 @@ type Service struct {
 
 	// authQueueStop cancels the auth update queue processing.
 	authQueueStop context.CancelFunc
-
-	// accessManager handles request access checks.
-	accessManager *sdkaccess.Manager
 
 	// coreManager handles core authentication and execution.
 	coreManager *coreauth.Manager
@@ -337,7 +333,7 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}
 
-	s.server = api.NewServer(s.cfg, s.coreManager, s.accessManager, s.configPath, s.serverOptions...)
+	s.server = api.NewServer(s.cfg, s.coreManager, s.configPath, s.serverOptions...)
 
 	if s.hooks.OnBeforeStart != nil {
 		s.hooks.OnBeforeStart(s.cfg)

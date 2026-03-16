@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	configaccess "github.com/router-for-me/CLIProxyAPI/v6/internal/access/config_access"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/buildinfo"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/cmd"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
@@ -68,7 +67,6 @@ func main() {
 
 	// Register file-backed persistence for Codex auth JSON files.
 	sdkAuth.RegisterTokenStore(sdkAuth.NewFileTokenStore())
-	configaccess.Register(&cfg.SDKConfig)
 
 	registry.StartModelsUpdater(context.Background())
 	cmd.StartService(cfg, resolvedConfigPath, "")

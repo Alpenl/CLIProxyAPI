@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/access"
 	managementHandlers "github.com/router-for-me/CLIProxyAPI/v6/internal/api/handlers/management"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api/middleware"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
@@ -23,7 +22,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/managementui"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers/openai"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
@@ -33,25 +31,18 @@ import (
 )
 
 type serverOptionConfig struct {
-	extraMiddleware      []gin.HandlerFunc
-	engineConfigurator   func(*gin.Engine)
-	routerConfigurator   func(*gin.Engine, *handlers.BaseAPIHandler, *config.Config)
-	requestLoggerFactory func(*config.Config, string) logging.RequestLogger
-	localPassword        string
-	keepAliveEnabled     bool
-	keepAliveTimeout     time.Duration
-	keepAliveOnTimeout   func()
-	postAuthHook         auth.PostAuthHook
+	extraMiddleware    []gin.HandlerFunc
+	engineConfigurator func(*gin.Engine)
+	routerConfigurator func(*gin.Engine, *handlers.BaseAPIHandler, *config.Config)
+	localPassword      string
+	keepAliveEnabled   bool
+	keepAliveTimeout   time.Duration
+	keepAliveOnTimeout func()
+	postAuthHook       auth.PostAuthHook
 }
 
 // ServerOption customises HTTP server construction.
 type ServerOption func(*serverOptionConfig)
-
-func defaultRequestLoggerFactory(cfg *config.Config, configPath string) logging.RequestLogger {
-	configDir := filepath.Dir(configPath)
-	logsDir := logging.ResolveLogDirectory(cfg)
-	return logging.NewFileRequestLogger(cfg.RequestLog, logsDir, configDir, cfg.ErrorLogsMaxFiles)
-}
 
 // WithMiddleware appends additional Gin middleware during server construction.
 func WithMiddleware(mw ...gin.HandlerFunc) ServerOption {
@@ -93,13 +84,6 @@ func WithKeepAliveEndpoint(timeout time.Duration, onTimeout func()) ServerOption
 	}
 }
 
-// WithRequestLoggerFactory customises request logger creation.
-func WithRequestLoggerFactory(factory func(*config.Config, string) logging.RequestLogger) ServerOption {
-	return func(cfg *serverOptionConfig) {
-		cfg.requestLoggerFactory = factory
-	}
-}
-
 // WithPostAuthHook registers a hook to be called after auth record creation.
 func WithPostAuthHook(hook auth.PostAuthHook) ServerOption {
 	return func(cfg *serverOptionConfig) {
@@ -126,8 +110,8 @@ type Server struct {
 	// This prevents issues when the config object is modified in place by Management API.
 	oldConfigYaml []byte
 
-	// accessManager handles request access checks.
-	accessManager *sdkaccess.Manager
+	// requestAuth validates downstream API keys for /v1 requests.
+	requestAuth *apiKeyAuthenticator
 
 	// requestLogger is the request logger instance for dynamic configuration updates.
 	requestLogger logging.RequestLogger
@@ -165,14 +149,10 @@ type Server struct {
 // Parameters:
 //   - cfg: The server configuration
 //   - authManager: core runtime auth manager
-//   - accessManager: request authentication manager
-//
 // Returns:
 //   - *Server: A new server instance
-func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdkaccess.Manager, configFilePath string, opts ...ServerOption) *Server {
-	optionState := &serverOptionConfig{
-		requestLoggerFactory: defaultRequestLoggerFactory,
-	}
+func NewServer(cfg *config.Config, authManager *auth.Manager, configFilePath string, opts ...ServerOption) *Server {
+	optionState := &serverOptionConfig{}
 	for i := range opts {
 		opts[i](optionState)
 	}
@@ -198,15 +178,13 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	// Resolve logs directory relative to the configuration file directory.
 	var requestLogger logging.RequestLogger
 	var toggle func(bool)
-	if !cfg.CommercialMode {
-		if optionState.requestLoggerFactory != nil {
-			requestLogger = optionState.requestLoggerFactory(cfg, configFilePath)
-		}
-		if requestLogger != nil {
-			engine.Use(middleware.RequestLoggingMiddleware(requestLogger))
-			if setter, ok := requestLogger.(interface{ SetEnabled(bool) }); ok {
-				toggle = setter.SetEnabled
-			}
+	configDir := filepath.Dir(configFilePath)
+	logsDir := logging.ResolveLogDirectory(cfg)
+	requestLogger = logging.NewFileRequestLogger(cfg.RequestLog, logsDir, configDir, cfg.ErrorLogsMaxFiles)
+	if requestLogger != nil {
+		engine.Use(middleware.RequestLoggingMiddleware(requestLogger))
+		if setter, ok := requestLogger.(interface{ SetEnabled(bool) }); ok {
+			toggle = setter.SetEnabled
 		}
 	}
 
@@ -225,7 +203,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		engine:              engine,
 		handlers:            handlers.NewBaseAPIHandlers(&cfg.SDKConfig, authManager),
 		cfg:                 cfg,
-		accessManager:       accessManager,
+		requestAuth:         newAPIKeyAuthenticator(cfg.APIKeys),
 		requestLogger:       requestLogger,
 		loggerToggle:        toggle,
 		configFilePath:      configFilePath,
@@ -234,7 +212,6 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	}
 	// Save initial YAML snapshot
 	s.oldConfigYaml, _ = yaml.Marshal(cfg)
-	s.applyAccessConfig(nil, cfg)
 	if authManager != nil {
 		authManager.SetRetryConfig(cfg.RequestRetry, time.Duration(cfg.MaxRetryInterval)*time.Second, cfg.MaxRetryCredentials)
 	}
@@ -289,7 +266,7 @@ func (s *Server) setupRoutes() {
 
 	// OpenAI compatible API routes
 	v1 := s.engine.Group("/v1")
-	v1.Use(AuthMiddleware(s.accessManager))
+	v1.Use(AuthMiddleware(s.requestAuth))
 	{
 		v1.GET("/models", openaiHandlers.OpenAIModels)
 		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
@@ -512,13 +489,11 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) applyAccessConfig(oldCfg, newCfg *config.Config) {
-	if s == nil || s.accessManager == nil || newCfg == nil {
+func (s *Server) updateRequestAuth(newCfg *config.Config) {
+	if s == nil || s.requestAuth == nil || newCfg == nil {
 		return
 	}
-	if _, err := access.ApplyAccessProviders(s.accessManager, oldCfg, newCfg); err != nil {
-		return
-	}
+	s.requestAuth.SetKeys(newCfg.APIKeys)
 }
 
 // UpdateClients updates the server's client list and configuration.
@@ -608,7 +583,7 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		}
 	}
 
-	s.applyAccessConfig(oldCfg, cfg)
+	s.updateRequestAuth(cfg)
 	s.cfg = cfg
 	// Save YAML snapshot for next comparison
 	s.oldConfigYaml, _ = yaml.Marshal(cfg)
@@ -641,27 +616,25 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 // AuthMiddleware returns a Gin middleware handler that authenticates requests
 // using the configured access checks. When none are available,
 // it allows all requests (legacy behaviour).
-func AuthMiddleware(manager *sdkaccess.Manager) gin.HandlerFunc {
+func AuthMiddleware(authenticator *apiKeyAuthenticator) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if manager == nil {
+		if authenticator == nil || !authenticator.Enabled() {
 			c.Next()
 			return
 		}
 
-		result, err := manager.Authenticate(c.Request.Context(), c.Request)
+		principal, provider, metadata, err := authenticator.Authenticate(c.Request)
 		if err == nil {
-			if result != nil {
-				c.Set("apiKey", result.Principal)
-				c.Set("accessProvider", result.Provider)
-				if len(result.Metadata) > 0 {
-					c.Set("accessMetadata", result.Metadata)
-				}
+			c.Set("apiKey", principal)
+			c.Set("accessProvider", provider)
+			if len(metadata) > 0 {
+				c.Set("accessMetadata", metadata)
 			}
 			c.Next()
 			return
 		}
 
-		statusCode := err.HTTPStatusCode()
+		statusCode := err.StatusCode
 		if statusCode >= http.StatusInternalServerError {
 			log.Errorf("authentication middleware error: %v", err)
 		}

@@ -11,7 +11,6 @@ import (
 	internalapi "github.com/router-for-me/CLIProxyAPI/v6/internal/api"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/logging"
 )
 
 // ServerOption customises HTTP server construction.
@@ -38,9 +37,4 @@ func WithLocalManagementPassword(password string) ServerOption {
 // WithKeepAliveEndpoint enables a keep-alive endpoint with the provided timeout and callback.
 func WithKeepAliveEndpoint(timeout time.Duration, onTimeout func()) ServerOption {
 	return internalapi.WithKeepAliveEndpoint(timeout, onTimeout)
-}
-
-// WithRequestLoggerFactory customises request logger creation.
-func WithRequestLoggerFactory(factory func(*config.Config, string) logging.RequestLogger) ServerOption {
-	return internalapi.WithRequestLoggerFactory(factory)
 }

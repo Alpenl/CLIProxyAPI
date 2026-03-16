@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator"
+	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator/openai/request_normalizer"
 
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
 	"github.com/tidwall/gjson"
