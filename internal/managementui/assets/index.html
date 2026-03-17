@@ -1312,7 +1312,7 @@
         },
         config: {
           title: "配置管理",
-          description: "维护监听地址、管理密钥、客户端 API Key、账号目录和最小运行参数。",
+          description: "维护监听地址、管理密钥、客户端 API Key、账号目录和自动补号参数。",
         },
         logs: {
           title: "操作日志",
@@ -1333,6 +1333,16 @@
             allowRemote: true,
             secretKey: "",
             secretConfigured: false,
+          },
+          replenishment: {
+            enabled: false,
+            targetAccountCount: 10,
+            checkIntervalSeconds: 300,
+            quotaRefreshIntervalSeconds: 3600,
+            cleanupInvalidAccounts: true,
+            serviceUrl: "",
+            serviceToken: "",
+            serviceTokenConfigured: false,
           },
           authDir: "./auths",
           apiKeysText: "",
@@ -1495,6 +1505,7 @@
         const source = payload && typeof payload === "object" ? payload : {};
         const tls = source.tls && typeof source.tls === "object" ? source.tls : {};
         const management = source.management && typeof source.management === "object" ? source.management : {};
+        const replenishment = source.replenishment && typeof source.replenishment === "object" ? source.replenishment : {};
         draft.host = normalizeString(source.host) || "";
         draft.port = normalizeNumber(source.port) || 8317;
         draft.tls.enable = Boolean(tls.enable);
@@ -1503,6 +1514,17 @@
         draft.management.allowRemote = management.allowRemote !== false;
         draft.management.secretConfigured = Boolean(management.secretConfigured);
         draft.management.secretKey = "";
+        draft.replenishment.enabled = Boolean(replenishment.enabled);
+        draft.replenishment.targetAccountCount = normalizeNumber(replenishment.targetAccountCount);
+        if (draft.replenishment.targetAccountCount === null) draft.replenishment.targetAccountCount = 10;
+        draft.replenishment.checkIntervalSeconds = normalizeNumber(replenishment.checkIntervalSeconds);
+        if (draft.replenishment.checkIntervalSeconds === null) draft.replenishment.checkIntervalSeconds = 300;
+        draft.replenishment.quotaRefreshIntervalSeconds = normalizeNumber(replenishment.quotaRefreshIntervalSeconds);
+        if (draft.replenishment.quotaRefreshIntervalSeconds === null) draft.replenishment.quotaRefreshIntervalSeconds = 3600;
+        draft.replenishment.cleanupInvalidAccounts = replenishment.cleanupInvalidAccounts !== false;
+        draft.replenishment.serviceUrl = normalizeString(replenishment.serviceUrl) || "";
+        draft.replenishment.serviceToken = "";
+        draft.replenishment.serviceTokenConfigured = Boolean(replenishment.serviceTokenConfigured);
         draft.authDir = normalizeString(source.authDir) || draft.authDir;
         draft.apiKeysText = Array.isArray(source.apiKeys) ? source.apiKeys.map((item) => String(item || "").trim()).filter(Boolean).join("\n") : "";
         draft.proxyUrl = normalizeString(source.proxyUrl) || "";
@@ -1540,6 +1562,15 @@
           management: {
             allowRemote: Boolean(current.management && current.management.allowRemote),
             secretKey: String(current.management && current.management.secretKey || "").trim(),
+          },
+          replenishment: {
+            enabled: Boolean(current.replenishment && current.replenishment.enabled),
+            targetAccountCount: Number(current.replenishment && current.replenishment.targetAccountCount || 0),
+            checkIntervalSeconds: Number(current.replenishment && current.replenishment.checkIntervalSeconds || 0),
+            quotaRefreshIntervalSeconds: Number(current.replenishment && current.replenishment.quotaRefreshIntervalSeconds || 0),
+            cleanupInvalidAccounts: Boolean(current.replenishment && current.replenishment.cleanupInvalidAccounts),
+            serviceUrl: String(current.replenishment && current.replenishment.serviceUrl || "").trim(),
+            serviceToken: String(current.replenishment && current.replenishment.serviceToken || "").trim(),
           },
           authDir: String(current.authDir || "").trim(),
           apiKeys,
@@ -3150,6 +3181,43 @@
                   ${isBootstrap ? (saving ? "正在初始化..." : "完成首次配置") : (saving ? "正在保存..." : "保存配置")}
                 </button>
                 ${!isBootstrap ? '<button class="button button-secondary" data-action="reload-config" type="button">重新读取</button>' : ""}
+              </div>
+            </article>
+            <article class="config-panel full">
+              <div>
+                <div class="section-kicker">自动补号</div>
+                <h3>账号池联动</h3>
+                <div class="helper" style="margin-top:6px;">由 CPA 负责维持目标账号数，并通过内网调用 cdx-rt 补号服务。</div>
+              </div>
+              <div class="config-form-grid">
+                <label class="switch-row">
+                  <input data-config-field="replenishment.enabled" type="checkbox" ${draft.replenishment.enabled ? "checked" : ""} />
+                  <span>启用自动补号</span>
+                </label>
+                <label class="switch-row">
+                  <input data-config-field="replenishment.cleanupInvalidAccounts" type="checkbox" ${draft.replenishment.cleanupInvalidAccounts ? "checked" : ""} />
+                  <span>自动清理失效账号</span>
+                </label>
+                <label class="field">
+                  <span class="field-label">目标可用账号数</span>
+                  <input data-config-field="replenishment.targetAccountCount" type="number" min="1" value="${escapeHTML(draft.replenishment.targetAccountCount)}" />
+                </label>
+                <label class="field">
+                  <span class="field-label">补号检查间隔秒数</span>
+                  <input data-config-field="replenishment.checkIntervalSeconds" type="number" min="1" value="${escapeHTML(draft.replenishment.checkIntervalSeconds)}" />
+                </label>
+                <label class="field">
+                  <span class="field-label">额度刷新间隔秒数</span>
+                  <input data-config-field="replenishment.quotaRefreshIntervalSeconds" type="number" min="1" value="${escapeHTML(draft.replenishment.quotaRefreshIntervalSeconds)}" />
+                </label>
+                <label class="field span-2">
+                  <span class="field-label">cdx-rt 服务地址</span>
+                  <input data-config-field="replenishment.serviceUrl" type="text" value="${escapeHTML(draft.replenishment.serviceUrl)}" placeholder="http://cdx-rt:3080" />
+                </label>
+                <label class="field span-2">
+                  <span class="field-label">cdx-rt 服务密钥</span>
+                  <input data-config-field="replenishment.serviceToken" type="password" value="" placeholder="${draft.replenishment.serviceTokenConfigured ? "留空表示保持当前密钥" : "首次配置时填写"}" autocomplete="new-password" />
+                </label>
               </div>
             </article>
           </section>

@@ -191,3 +191,100 @@ usage-statistics-enabled: true
 		t.Fatalf("secretKey = %#v, want empty string", got)
 	}
 }
+
+func TestGetWebConfig_RedactsReplenishmentServiceToken(t *testing.T) {
+	handler, _ := newConfigManagementTestHandler(t, `
+host: ""
+port: 8317
+remote-management:
+  allow-remote: true
+  secret-key: "bootstrap-secret"
+auth-dir: "./auths"
+api-keys:
+  - "client-a"
+replenishment:
+  enabled: true
+  target-account-count: 12
+  check-interval-seconds: 300
+  quota-refresh-interval-seconds: 3600
+  cleanup-invalid-accounts: true
+  service-url: "http://cdx-rt:3080"
+  service-token: "service-secret"
+usage-statistics-enabled: true
+`)
+
+	router := gin.New()
+	router.GET("/v0/management/config", handler.GetWebConfig)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/management/config", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	payload := decodeManagementResponse(t, rr)
+	configPayload, ok := payload["config"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected config object, got %#v", payload["config"])
+	}
+	replenishmentPayload, ok := configPayload["replenishment"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected replenishment object, got %#v", configPayload["replenishment"])
+	}
+	if replenishmentPayload["serviceTokenConfigured"] != true {
+		t.Fatalf("serviceTokenConfigured = %#v, want true", replenishmentPayload["serviceTokenConfigured"])
+	}
+	if got := replenishmentPayload["serviceToken"]; got != "" {
+		t.Fatalf("serviceToken = %#v, want empty string", got)
+	}
+}
+
+func TestUpdateWebConfig_RejectsInvalidReplenishmentURL(t *testing.T) {
+	handler, _ := newConfigManagementTestHandler(t, `
+host: ""
+port: 8317
+remote-management:
+  allow-remote: true
+  secret-key: "bootstrap-secret"
+auth-dir: "./auths"
+api-keys:
+  - "client-a"
+usage-statistics-enabled: true
+`)
+
+	router := gin.New()
+	router.PUT("/v0/management/config", handler.UpdateWebConfig)
+
+	body := bytes.NewBufferString(`{
+  "host": "",
+  "port": 8317,
+  "authDir": "./auths",
+  "apiKeys": ["client-a"],
+  "management": {
+    "allowRemote": true,
+    "secretKey": ""
+  },
+  "replenishment": {
+    "enabled": true,
+    "targetAccountCount": 10,
+    "checkIntervalSeconds": 300,
+    "quotaRefreshIntervalSeconds": 3600,
+    "cleanupInvalidAccounts": true,
+    "serviceUrl": "not-a-url",
+    "serviceToken": ""
+  },
+  "usageStatisticsEnabled": true,
+  "routingStrategy": "round-robin"
+}`)
+	req := httptest.NewRequest(http.MethodPut, "/v0/management/config", body)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}

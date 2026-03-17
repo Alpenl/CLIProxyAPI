@@ -48,6 +48,15 @@ max-retry-interval: 30
 routing:
   strategy: "round-robin"
 
+replenishment:
+  enabled: false
+  target-account-count: 10
+  check-interval-seconds: 300
+  quota-refresh-interval-seconds: 3600
+  cleanup-invalid-accounts: true
+  service-url: "http://cdx-rt:3080"
+  service-token: ""
+
 nonstream-keepalive-interval: 0
 
 # Optional defaults for file-backed Codex OAuth accounts.

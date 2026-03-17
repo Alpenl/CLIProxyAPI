@@ -68,6 +68,9 @@ type Config struct {
 	// CodexHeaderDefaults configures fallback headers for Codex OAuth model requests.
 	// These are used only when the client does not send its own headers.
 	CodexHeaderDefaults CodexHeaderDefaults `yaml:"codex-header-defaults" json:"codex-header-defaults"`
+
+	// Replenishment controls automatic Codex account pool top-up via cdx-rt.
+	Replenishment ReplenishmentConfig `yaml:"replenishment" json:"replenishment"`
 }
 
 // CodexHeaderDefaults configures fallback header values injected into Codex
@@ -101,6 +104,17 @@ type RoutingConfig struct {
 	// Strategy selects the credential selection strategy.
 	// Supported values: "round-robin" (default), "fill-first".
 	Strategy string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+}
+
+// ReplenishmentConfig configures automatic account pool replenishment.
+type ReplenishmentConfig struct {
+	Enabled                     bool   `yaml:"enabled" json:"enabled"`
+	TargetAccountCount          int    `yaml:"target-account-count" json:"target-account-count"`
+	CheckIntervalSeconds        int    `yaml:"check-interval-seconds" json:"check-interval-seconds"`
+	QuotaRefreshIntervalSeconds int    `yaml:"quota-refresh-interval-seconds" json:"quota-refresh-interval-seconds"`
+	CleanupInvalidAccounts      bool   `yaml:"cleanup-invalid-accounts" json:"cleanup-invalid-accounts"`
+	ServiceURL                  string `yaml:"service-url" json:"service-url"`
+	ServiceToken                string `yaml:"service-token" json:"service-token"`
 }
 
 // LoadConfig reads a YAML configuration file from the given path,
@@ -147,6 +161,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	cfg.ErrorLogsMaxFiles = 10
 	cfg.UsageStatisticsEnabled = true
 	cfg.DisableCooling = false
+	cfg.Replenishment = DefaultReplenishmentConfig()
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		if optional {
 			// In cloud deploy mode, if YAML parsing fails, return empty config instead of error.
@@ -180,6 +195,18 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	if cfg.MaxRetryCredentials < 0 {
 		cfg.MaxRetryCredentials = 0
 	}
+
+	if cfg.Replenishment.TargetAccountCount <= 0 {
+		cfg.Replenishment.TargetAccountCount = 10
+	}
+	if cfg.Replenishment.CheckIntervalSeconds <= 0 {
+		cfg.Replenishment.CheckIntervalSeconds = 300
+	}
+	if cfg.Replenishment.QuotaRefreshIntervalSeconds <= 0 {
+		cfg.Replenishment.QuotaRefreshIntervalSeconds = 3600
+	}
+	cfg.Replenishment.ServiceURL = strings.TrimSpace(cfg.Replenishment.ServiceURL)
+	cfg.Replenishment.ServiceToken = strings.TrimSpace(cfg.Replenishment.ServiceToken)
 
 	// Sanitize Codex header defaults.
 	cfg.SanitizeCodexHeaderDefaults()

@@ -67,6 +67,20 @@ func DefaultBootstrapConfig() *Config {
 		MaxRetryCredentials:    0,
 		MaxRetryInterval:       30,
 		Routing:                RoutingConfig{Strategy: "round-robin"},
+		Replenishment:          DefaultReplenishmentConfig(),
+	}
+}
+
+// DefaultReplenishmentConfig returns the default account top-up settings.
+func DefaultReplenishmentConfig() ReplenishmentConfig {
+	return ReplenishmentConfig{
+		Enabled:                     false,
+		TargetAccountCount:          10,
+		CheckIntervalSeconds:        300,
+		QuotaRefreshIntervalSeconds: 3600,
+		CleanupInvalidAccounts:      true,
+		ServiceURL:                  "",
+		ServiceToken:                "",
 	}
 }
 
@@ -166,6 +180,15 @@ max-retry-interval: %d
 
 routing:
   strategy: %q
+
+replenishment:
+  enabled: %t
+  target-account-count: %d
+  check-interval-seconds: %d
+  quota-refresh-interval-seconds: %d
+  cleanup-invalid-accounts: %t
+  service-url: %q
+  service-token: %q
 `,
 		cfg.Host,
 		cfg.Port,
@@ -187,6 +210,13 @@ routing:
 		cfg.MaxRetryCredentials,
 		cfg.MaxRetryInterval,
 		normalizeRoutingStrategyValue(cfg.Routing.Strategy),
+		cfg.Replenishment.Enabled,
+		cfg.Replenishment.TargetAccountCount,
+		cfg.Replenishment.CheckIntervalSeconds,
+		cfg.Replenishment.QuotaRefreshIntervalSeconds,
+		cfg.Replenishment.CleanupInvalidAccounts,
+		cfg.Replenishment.ServiceURL,
+		cfg.Replenishment.ServiceToken,
 	)
 }
 

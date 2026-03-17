@@ -3,6 +3,7 @@ package management
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -21,24 +22,46 @@ type webConfigTLSPayload struct {
 	Key    string `json:"key"`
 }
 
+type webConfigReplenishmentPayload struct {
+	Enabled                     bool   `json:"enabled"`
+	TargetAccountCount          int    `json:"targetAccountCount"`
+	CheckIntervalSeconds        int    `json:"checkIntervalSeconds"`
+	QuotaRefreshIntervalSeconds int    `json:"quotaRefreshIntervalSeconds"`
+	CleanupInvalidAccounts      bool   `json:"cleanupInvalidAccounts"`
+	ServiceURL                  string `json:"serviceUrl"`
+	ServiceToken                string `json:"serviceToken"`
+	ServiceTokenConfigured      bool   `json:"serviceTokenConfigured"`
+}
+
 type webConfigPayload struct {
-	Host                   string                     `json:"host"`
-	Port                   int                        `json:"port"`
-	TLS                    webConfigTLSPayload        `json:"tls"`
-	Management             webConfigManagementPayload `json:"management"`
-	AuthDir                string                     `json:"authDir"`
-	APIKeys                []string                   `json:"apiKeys"`
-	ProxyURL               string                     `json:"proxyUrl"`
-	LoggingToFile          bool                       `json:"loggingToFile"`
-	LogsMaxTotalSizeMB     int                        `json:"logsMaxTotalSizeMB"`
-	ErrorLogsMaxFiles      int                        `json:"errorLogsMaxFiles"`
-	UsageStatisticsEnabled bool                       `json:"usageStatisticsEnabled"`
-	RequestLog             bool                       `json:"requestLog"`
-	DisableCooling         bool                       `json:"disableCooling"`
-	RequestRetry           int                        `json:"requestRetry"`
-	MaxRetryCredentials    int                        `json:"maxRetryCredentials"`
-	MaxRetryInterval       int                        `json:"maxRetryInterval"`
-	RoutingStrategy        string                     `json:"routingStrategy"`
+	Host                   string                        `json:"host"`
+	Port                   int                           `json:"port"`
+	TLS                    webConfigTLSPayload           `json:"tls"`
+	Management             webConfigManagementPayload    `json:"management"`
+	Replenishment          webConfigReplenishmentPayload `json:"replenishment"`
+	AuthDir                string                        `json:"authDir"`
+	APIKeys                []string                      `json:"apiKeys"`
+	ProxyURL               string                        `json:"proxyUrl"`
+	LoggingToFile          bool                          `json:"loggingToFile"`
+	LogsMaxTotalSizeMB     int                           `json:"logsMaxTotalSizeMB"`
+	ErrorLogsMaxFiles      int                           `json:"errorLogsMaxFiles"`
+	UsageStatisticsEnabled bool                          `json:"usageStatisticsEnabled"`
+	RequestLog             bool                          `json:"requestLog"`
+	DisableCooling         bool                          `json:"disableCooling"`
+	RequestRetry           int                           `json:"requestRetry"`
+	MaxRetryCredentials    int                           `json:"maxRetryCredentials"`
+	MaxRetryInterval       int                           `json:"maxRetryInterval"`
+	RoutingStrategy        string                        `json:"routingStrategy"`
+}
+
+func isZeroReplenishmentPayload(payload webConfigReplenishmentPayload) bool {
+	return !payload.Enabled &&
+		payload.TargetAccountCount == 0 &&
+		payload.CheckIntervalSeconds == 0 &&
+		payload.QuotaRefreshIntervalSeconds == 0 &&
+		!payload.CleanupInvalidAccounts &&
+		strings.TrimSpace(payload.ServiceURL) == "" &&
+		strings.TrimSpace(payload.ServiceToken) == ""
 }
 
 func (h *Handler) GetBootstrapStatus(c *gin.Context) {
@@ -203,6 +226,44 @@ func (h *Handler) mergeWebConfig(body webConfigPayload, requireSecret bool) (*co
 	nextCfg.MaxRetryInterval = body.MaxRetryInterval
 	nextCfg.Routing.Strategy = strategy
 
+	nextCfg.Replenishment = current.Replenishment
+	if nextCfg.Replenishment.TargetAccountCount <= 0 {
+		nextCfg.Replenishment = config.DefaultReplenishmentConfig()
+	}
+
+	if !isZeroReplenishmentPayload(body.Replenishment) {
+		if body.Replenishment.TargetAccountCount <= 0 {
+			return nil, nil, fmt.Errorf("replenishment.targetAccountCount must be >= 1")
+		}
+		if body.Replenishment.CheckIntervalSeconds <= 0 {
+			return nil, nil, fmt.Errorf("replenishment.checkIntervalSeconds must be >= 1")
+		}
+		if body.Replenishment.QuotaRefreshIntervalSeconds <= 0 {
+			return nil, nil, fmt.Errorf("replenishment.quotaRefreshIntervalSeconds must be >= 1")
+		}
+
+		serviceURL := strings.TrimSpace(body.Replenishment.ServiceURL)
+		if serviceURL != "" {
+			parsedURL, err := url.Parse(serviceURL)
+			if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+				return nil, nil, fmt.Errorf("replenishment.serviceUrl must be a valid http(s) URL")
+			}
+			if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+				return nil, nil, fmt.Errorf("replenishment.serviceUrl must be a valid http(s) URL")
+			}
+		}
+
+		nextCfg.Replenishment.Enabled = body.Replenishment.Enabled
+		nextCfg.Replenishment.TargetAccountCount = body.Replenishment.TargetAccountCount
+		nextCfg.Replenishment.CheckIntervalSeconds = body.Replenishment.CheckIntervalSeconds
+		nextCfg.Replenishment.QuotaRefreshIntervalSeconds = body.Replenishment.QuotaRefreshIntervalSeconds
+		nextCfg.Replenishment.CleanupInvalidAccounts = body.Replenishment.CleanupInvalidAccounts
+		nextCfg.Replenishment.ServiceURL = serviceURL
+		if token := strings.TrimSpace(body.Replenishment.ServiceToken); token != "" {
+			nextCfg.Replenishment.ServiceToken = token
+		}
+	}
+
 	return &nextCfg, restartFields, nil
 }
 
@@ -223,6 +284,16 @@ func (h *Handler) webConfigView() webConfigPayload {
 			AllowRemote:      cfg.RemoteManagement.AllowRemote,
 			SecretConfigured: strings.TrimSpace(cfg.RemoteManagement.SecretKey) != "",
 			SecretKey:        "",
+		},
+		Replenishment: webConfigReplenishmentPayload{
+			Enabled:                     cfg.Replenishment.Enabled,
+			TargetAccountCount:          cfg.Replenishment.TargetAccountCount,
+			CheckIntervalSeconds:        cfg.Replenishment.CheckIntervalSeconds,
+			QuotaRefreshIntervalSeconds: cfg.Replenishment.QuotaRefreshIntervalSeconds,
+			CleanupInvalidAccounts:      cfg.Replenishment.CleanupInvalidAccounts,
+			ServiceURL:                  cfg.Replenishment.ServiceURL,
+			ServiceToken:                "",
+			ServiceTokenConfigured:      strings.TrimSpace(cfg.Replenishment.ServiceToken) != "",
 		},
 		AuthDir:                cfg.AuthDir,
 		APIKeys:                append([]string(nil), cfg.APIKeys...),
