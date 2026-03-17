@@ -28,6 +28,8 @@ auths/*
 
 # Documentation
 docs/*
+!docs/plans/
+!docs/plans/*.md
 AGENTS.md
 CLAUDE.md
 GEMINI.md
