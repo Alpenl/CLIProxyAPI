@@ -17,13 +17,19 @@ import (
 )
 
 func (w *Watcher) start(ctx context.Context) error {
-	if errAddConfig := w.watcher.Add(w.configPath); errAddConfig != nil {
+	if errAddConfigDir := w.ensureWatch(w.configDir()); errAddConfigDir != nil {
+		log.Errorf("failed to watch config directory %s: %v", w.configDir(), errAddConfigDir)
+		return errAddConfigDir
+	}
+	log.Debugf("watching config directory: %s", w.configDir())
+
+	if errAddConfig := w.ensureWatch(w.configPath); errAddConfig != nil {
 		log.Errorf("failed to watch config file %s: %v", w.configPath, errAddConfig)
 		return errAddConfig
 	}
 	log.Debugf("watching config file: %s", w.configPath)
 
-	if errAddAuthDir := w.watcher.Add(w.authDir); errAddAuthDir != nil {
+	if errAddAuthDir := w.ensureWatch(w.authDir); errAddAuthDir != nil {
 		log.Errorf("failed to watch auth directory %s: %v", w.authDir, errAddAuthDir)
 		return errAddAuthDir
 	}
@@ -56,7 +62,7 @@ func (w *Watcher) processEvents(ctx context.Context) {
 
 func (w *Watcher) handleEvent(event fsnotify.Event) {
 	// Filter only relevant events: config file or auth-dir JSON files.
-	configOps := fsnotify.Write | fsnotify.Create | fsnotify.Rename
+	configOps := fsnotify.Write | fsnotify.Create | fsnotify.Rename | fsnotify.Remove
 	normalizedName := w.normalizeAuthPath(event.Name)
 	normalizedConfigPath := w.normalizeAuthPath(w.configPath)
 	normalizedAuthDir := w.normalizeAuthPath(w.authDir)
@@ -181,4 +187,26 @@ func (w *Watcher) shouldDebounceRemove(normalizedPath string, now time.Time) boo
 	}
 	w.clientsMutex.Unlock()
 	return false
+}
+
+func (w *Watcher) configDir() string {
+	dir := filepath.Dir(w.configPath)
+	if strings.TrimSpace(dir) == "" {
+		return "."
+	}
+	return dir
+}
+
+func (w *Watcher) ensureWatch(path string) error {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return nil
+	}
+	normalized := w.normalizeAuthPath(trimmed)
+	for _, watched := range w.watcher.WatchList() {
+		if w.normalizeAuthPath(watched) == normalized {
+			return nil
+		}
+	}
+	return w.watcher.Add(trimmed)
 }

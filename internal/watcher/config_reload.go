@@ -40,6 +40,15 @@ func (w *Watcher) scheduleConfigReload() {
 }
 
 func (w *Watcher) reloadConfigIfChanged() {
+	defer func() {
+		if err := w.ensureWatch(w.configDir()); err != nil {
+			log.WithError(err).Debugf("failed to re-arm config directory watch for %s", w.configDir())
+		}
+		if err := w.ensureWatch(w.configPath); err != nil {
+			log.WithError(err).Debugf("failed to re-arm config file watch for %s", w.configPath)
+		}
+	}()
+
 	data, err := os.ReadFile(w.configPath)
 	if err != nil {
 		log.Errorf("failed to read config file for hash check: %v", err)

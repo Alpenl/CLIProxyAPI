@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/fileperm"
 	codexexecutor "github.com/router-for-me/CLIProxyAPI/v6/internal/runtime/executor"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 )
@@ -366,11 +367,24 @@ func (h *Handler) importCodexFile(ctx context.Context, sourceName string, data [
 	if !strings.HasSuffix(strings.ToLower(fileName), ".json") {
 		fileName += ".json"
 	}
+	if reason, duplicate := h.codexDuplicateReason(data, metadata); duplicate {
+		result.Name = fileName
+		result.Status = "skipped"
+		result.Reason = reason
+		return result, fmt.Errorf("%s", reason)
+	}
 	dst := filepath.Join(h.cfg.AuthDir, fileName)
-	if err = os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+	dir := filepath.Dir(dst)
+	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return result, err
 	}
-	if err = os.WriteFile(dst, data, 0o600); err != nil {
+	if err = fileperm.BestEffortChmod(dir, 0o755); err != nil {
+		return result, err
+	}
+	if err = os.WriteFile(dst, data, 0o644); err != nil {
+		return result, err
+	}
+	if err = fileperm.BestEffortChmod(dst, 0o644); err != nil {
 		return result, err
 	}
 	if err = h.registerAuthFromFile(ctx, dst, data); err != nil {
@@ -548,7 +562,10 @@ func (h *Handler) persistCodexAuth(ctx context.Context, auth *coreauth.Auth, pat
 	if err != nil {
 		return fmt.Errorf("failed to encode auth metadata: %w", err)
 	}
-	if err = os.WriteFile(path, data, 0o600); err != nil {
+	if err = os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("failed to persist auth file: %w", err)
+	}
+	if err = fileperm.BestEffortChmod(path, 0o644); err != nil {
 		return fmt.Errorf("failed to persist auth file: %w", err)
 	}
 	return h.registerAuthFromFile(ctx, path, data)

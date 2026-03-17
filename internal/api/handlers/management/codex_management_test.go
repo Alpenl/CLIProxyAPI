@@ -1,6 +1,7 @@
 package management
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -139,8 +140,12 @@ func TestCodexManagementImportDirectory_ImportsValidCodexFiles(t *testing.T) {
 	}
 
 	importedPath := filepath.Join(authDir, "codex-first.json")
-	if _, err := os.Stat(importedPath); err != nil {
+	info, err := os.Stat(importedPath)
+	if err != nil {
 		t.Fatalf("expected imported file at %s: %v", importedPath, err)
+	}
+	if got := info.Mode().Perm(); got != 0o644 {
+		t.Fatalf("imported file mode = %04o, want 0644", got)
 	}
 
 	auths := manager.List()
@@ -189,8 +194,12 @@ func TestCodexManagementImportFiles_ImportsUploadedCodexFiles(t *testing.T) {
 	}
 
 	importedPath := filepath.Join(authDir, "codex-upload.json")
-	if _, err = os.Stat(importedPath); err != nil {
+	info, err := os.Stat(importedPath)
+	if err != nil {
 		t.Fatalf("expected imported file at %s: %v", importedPath, err)
+	}
+	if got := info.Mode().Perm(); got != 0o644 {
+		t.Fatalf("uploaded file mode = %04o, want 0644", got)
 	}
 
 	auths := manager.List()
@@ -285,5 +294,96 @@ func TestCodexManagementDeleteAccount_RemovesAuthFile(t *testing.T) {
 	}
 	if remaining := manager.List(); len(remaining) != 0 {
 		t.Fatalf("expected auth manager to be empty, got %d entries", len(remaining))
+	}
+}
+
+func TestImportCodexArchiveBytes_ImportsAccountFilesFromZip(t *testing.T) {
+	handler, manager, authDir := newCodexManagementTestHandler(t)
+
+	var archive bytes.Buffer
+	zipWriter := zip.NewWriter(&archive)
+	accountFile, err := zipWriter.Create("accounts/codex-archive.json")
+	if err != nil {
+		t.Fatalf("failed to create zip account entry: %v", err)
+	}
+	if _, err = accountFile.Write([]byte(`{"type":"codex","email":"archive@example.com","refresh_token":"refresh-archive","access_token":"access-archive"}`)); err != nil {
+		t.Fatalf("failed to write zip account entry: %v", err)
+	}
+	manifestFile, err := zipWriter.Create("manifest.json")
+	if err != nil {
+		t.Fatalf("failed to create manifest entry: %v", err)
+	}
+	if _, err = manifestFile.Write([]byte(`{"entryNames":["accounts/codex-archive.json"]}`)); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
+	if err = zipWriter.Close(); err != nil {
+		t.Fatalf("failed to close zip writer: %v", err)
+	}
+
+	summary, err := handler.ImportCodexArchiveBytes(context.Background(), archive.Bytes())
+	if err != nil {
+		t.Fatalf("ImportCodexArchiveBytes() error = %v", err)
+	}
+	if summary.Imported != 1 {
+		t.Fatalf("Imported = %d, want 1", summary.Imported)
+	}
+	if summary.Skipped != 0 {
+		t.Fatalf("Skipped = %d, want 0", summary.Skipped)
+	}
+
+	importedPath := filepath.Join(authDir, "codex-archive.json")
+	if _, err = os.Stat(importedPath); err != nil {
+		t.Fatalf("expected imported file at %s: %v", importedPath, err)
+	}
+
+	auths := manager.List()
+	if len(auths) != 1 {
+		t.Fatalf("expected 1 registered auth, got %d", len(auths))
+	}
+	if got := auths[0].FileName; got != "codex-archive.json" {
+		t.Fatalf("expected imported auth file name codex-archive.json, got %s", got)
+	}
+}
+
+func TestImportCodexArchiveBytes_SkipsDuplicateEmail(t *testing.T) {
+	handler, manager, authDir := newCodexManagementTestHandler(t)
+
+	existingPath := writeAuthJSONFile(t, authDir, "codex-existing.json", `{"type":"codex","email":"duplicate@example.com","refresh_token":"refresh-existing","access_token":"access-existing"}`)
+	registerAuthFile(t, handler, existingPath)
+
+	var archive bytes.Buffer
+	zipWriter := zip.NewWriter(&archive)
+	accountFile, err := zipWriter.Create("accounts/codex-duplicate.json")
+	if err != nil {
+		t.Fatalf("failed to create zip account entry: %v", err)
+	}
+	if _, err = accountFile.Write([]byte(`{"type":"codex","email":"duplicate@example.com","refresh_token":"refresh-new","access_token":"access-new"}`)); err != nil {
+		t.Fatalf("failed to write zip account entry: %v", err)
+	}
+	if err = zipWriter.Close(); err != nil {
+		t.Fatalf("failed to close zip writer: %v", err)
+	}
+
+	summary, err := handler.ImportCodexArchiveBytes(context.Background(), archive.Bytes())
+	if err != nil {
+		t.Fatalf("ImportCodexArchiveBytes() error = %v", err)
+	}
+	if summary.Imported != 0 {
+		t.Fatalf("Imported = %d, want 0", summary.Imported)
+	}
+	if summary.Skipped != 1 {
+		t.Fatalf("Skipped = %d, want 1", summary.Skipped)
+	}
+
+	if _, err := os.Stat(filepath.Join(authDir, "codex-duplicate.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected duplicate auth file not to be written, stat err: %v", err)
+	}
+
+	auths := manager.List()
+	if len(auths) != 1 {
+		t.Fatalf("expected 1 registered auth, got %d", len(auths))
+	}
+	if got := auths[0].FileName; got != "codex-existing.json" {
+		t.Fatalf("expected existing auth file name codex-existing.json, got %s", got)
 	}
 }

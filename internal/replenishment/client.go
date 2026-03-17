@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -47,14 +48,11 @@ func (c *Client) CreateJob(ctx context.Context, input CreateJobInput) (*Job, err
 		return nil, fmt.Errorf("marshal create job request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/jobs", bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/jobs", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.secret != "" {
-		req.Header.Set("X-Management-Secret", c.secret)
-	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -76,4 +74,82 @@ func (c *Client) CreateJob(ctx context.Context, input CreateJobInput) (*Job, err
 		return nil, fmt.Errorf("create job response missing job")
 	}
 	return payload.Job, nil
+}
+
+func (c *Client) GetJob(ctx context.Context, id string) (*Job, error) {
+	if c == nil {
+		return nil, fmt.Errorf("client is nil")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("job ID is required")
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/jobs/"+id, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send get job request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("get job failed with status %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		Job *Job `json:"job"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("decode get job response: %w", err)
+	}
+	return payload.Job, nil
+}
+
+func (c *Client) DownloadArchive(ctx context.Context, id string) ([]byte, error) {
+	if c == nil {
+		return nil, fmt.Errorf("client is nil")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("job ID is required")
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/jobs/"+id+"/archive", nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send download archive request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("download archive failed with status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read archive response: %w", err)
+	}
+	return data, nil
+}
+
+func (c *Client) newRequest(ctx context.Context, method string, path string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	if err != nil {
+		return nil, err
+	}
+	if c.secret != "" {
+		req.Header.Set("X-Management-Secret", c.secret)
+	}
+	return req, nil
 }

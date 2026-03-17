@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/fileperm"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/misc"
 )
 
@@ -56,11 +57,15 @@ func (ts *CodexTokenStorage) SetMetadata(meta map[string]any) {
 func (ts *CodexTokenStorage) SaveTokenToFile(authFilePath string) error {
 	misc.LogSavingCredentials(authFilePath)
 	ts.Type = "codex"
-	if err := os.MkdirAll(filepath.Dir(authFilePath), 0700); err != nil {
+	dir := filepath.Dir(authFilePath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
+	if err := fileperm.BestEffortChmod(dir, 0o755); err != nil {
+		return fmt.Errorf("failed to set directory permissions: %w", err)
+	}
 
-	f, err := os.Create(authFilePath)
+	f, err := os.OpenFile(authFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to create token file: %w", err)
 	}
@@ -76,6 +81,9 @@ func (ts *CodexTokenStorage) SaveTokenToFile(authFilePath string) error {
 
 	if err = json.NewEncoder(f).Encode(data); err != nil {
 		return fmt.Errorf("failed to write token to file: %w", err)
+	}
+	if err = fileperm.BestEffortChmod(authFilePath, 0o644); err != nil {
+		return fmt.Errorf("failed to set token file permissions: %w", err)
 	}
 	return nil
 

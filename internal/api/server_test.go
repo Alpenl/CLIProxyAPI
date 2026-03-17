@@ -1,7 +1,9 @@
 package api
 
 import (
+	"archive/zip"
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -186,6 +188,210 @@ func TestServerRegistersBootstrapRoutesWithoutManagementSecret(t *testing.T) {
 	}
 }
 
+func TestServerRunReplenishmentOnce_ImportsCompletedArchive(t *testing.T) {
+	authArchive := buildCodexArchive(t, "codex-topup.json", `{"type":"codex","email":"topup@example.com","refresh_token":"refresh-topup","access_token":"access-topup"}`)
+
+	jobStatus := "queued"
+	createCalls := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Management-Secret"); got != "service-secret" {
+			t.Fatalf("X-Management-Secret = %q, want service-secret", got)
+		}
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/jobs":
+			createCalls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"queued","requestedSuccesses":1}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"` + jobStatus + `","requestedSuccesses":1}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1/archive":
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(authArchive)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer service.Close()
+
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	authDir := filepath.Join(tmpDir, "auth")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("failed to create auth dir: %v", err)
+	}
+
+	cfg := &proxyconfig.Config{
+		SDKConfig: sdkconfig.SDKConfig{
+			APIKeys: []string{"test-key"},
+		},
+		Port:    0,
+		AuthDir: authDir,
+		Debug:   true,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			SecretKey: "test-management-key",
+		},
+		LoggingToFile:          false,
+		UsageStatisticsEnabled: false,
+		Replenishment: proxyconfig.ReplenishmentConfig{
+			Enabled:            true,
+			TargetAccountCount: 1,
+			ServiceURL:         service.URL,
+			ServiceToken:       "service-secret",
+		},
+	}
+
+	server := NewServer(cfg, auth.NewManager(nil, nil, nil), filepath.Join(tmpDir, "config.yaml"))
+
+	if err := server.runReplenishmentOnce(context.Background()); err != nil {
+		t.Fatalf("first runReplenishmentOnce() error = %v", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("createCalls = %d, want 1", createCalls)
+	}
+	if got := len(server.handlers.AuthManager.List()); got != 0 {
+		t.Fatalf("auth count after first run = %d, want 0", got)
+	}
+
+	jobStatus = "completed"
+	if err := server.runReplenishmentOnce(context.Background()); err != nil {
+		t.Fatalf("second runReplenishmentOnce() error = %v", err)
+	}
+
+	auths := server.handlers.AuthManager.List()
+	if len(auths) != 1 {
+		t.Fatalf("auth count after import = %d, want 1", len(auths))
+	}
+	if got := auths[0].FileName; got != "codex-topup.json" {
+		t.Fatalf("auth file name = %q, want codex-topup.json", got)
+	}
+	if _, err := os.Stat(filepath.Join(authDir, "codex-topup.json")); err != nil {
+		t.Fatalf("expected imported auth file: %v", err)
+	}
+}
+
+func TestServerTriggerReplenishment_RunsWhenAutoDisabled(t *testing.T) {
+	createCalls := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/jobs":
+			createCalls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"queued","requestedSuccesses":2}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"queued","requestedSuccesses":2}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer service.Close()
+
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	authDir := filepath.Join(tmpDir, "auth")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("failed to create auth dir: %v", err)
+	}
+
+	cfg := &proxyconfig.Config{
+		SDKConfig: sdkconfig.SDKConfig{
+			APIKeys: []string{"test-key"},
+		},
+		Port:    0,
+		AuthDir: authDir,
+		Debug:   true,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			SecretKey: "test-management-key",
+		},
+		LoggingToFile:          false,
+		UsageStatisticsEnabled: false,
+		Replenishment: proxyconfig.ReplenishmentConfig{
+			Enabled:            false,
+			TargetAccountCount: 2,
+			ServiceURL:         service.URL,
+			ServiceToken:       "service-secret",
+		},
+	}
+
+	server := NewServer(cfg, auth.NewManager(nil, nil, nil), filepath.Join(tmpDir, "config.yaml"))
+
+	if _, err := server.triggerReplenishment(context.Background()); err != nil {
+		t.Fatalf("triggerReplenishment() error = %v", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("createCalls = %d, want 1", createCalls)
+	}
+}
+
+func TestServerUpdateClients_StartsReplenishmentLoopWhenEnabledByReload(t *testing.T) {
+	createCalls := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/jobs":
+			createCalls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"queued","requestedSuccesses":1}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"queued","requestedSuccesses":1}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer service.Close()
+
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	authDir := filepath.Join(tmpDir, "auth")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("failed to create auth dir: %v", err)
+	}
+
+	cfg := &proxyconfig.Config{
+		SDKConfig: sdkconfig.SDKConfig{
+			APIKeys: []string{"test-key"},
+		},
+		Port:    0,
+		AuthDir: authDir,
+		Debug:   true,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			SecretKey: "test-management-key",
+		},
+		LoggingToFile:          false,
+		UsageStatisticsEnabled: false,
+		Replenishment: proxyconfig.ReplenishmentConfig{
+			Enabled:              false,
+			TargetAccountCount:   1,
+			CheckIntervalSeconds: 1,
+			ServiceURL:           service.URL,
+			ServiceToken:         "service-secret",
+		},
+	}
+
+	server := NewServer(cfg, auth.NewManager(nil, nil, nil), filepath.Join(tmpDir, "config.yaml"))
+	defer server.stopReplenishmentLoop()
+
+	updated := *cfg
+	updated.Replenishment.Enabled = true
+
+	server.UpdateClients(&updated)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if createCalls > 0 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	t.Fatalf("createCalls = %d, want replenishment loop to start and create a job after reload", createCalls)
+}
+
 func TestServerRemovesLegacyRoutes(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -215,6 +421,25 @@ func TestServerRemovesLegacyRoutes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func buildCodexArchive(t *testing.T, name string, payload string) []byte {
+	t.Helper()
+
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+
+	accountFile, err := writer.Create("accounts/" + name)
+	if err != nil {
+		t.Fatalf("failed to create account entry: %v", err)
+	}
+	if _, err = accountFile.Write([]byte(payload)); err != nil {
+		t.Fatalf("failed to write account entry: %v", err)
+	}
+	if err = writer.Close(); err != nil {
+		t.Fatalf("failed to close archive writer: %v", err)
+	}
+	return archive.Bytes()
 }
 
 func TestDefaultRequestLoggerFactory_UsesResolvedLogDirectory(t *testing.T) {

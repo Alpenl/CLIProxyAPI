@@ -16,17 +16,27 @@ ARG BUILD_DATE=unknown
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux GOMAXPROCS=1 go build -trimpath -buildvcs=false -mod=vendor -p=1 -tags timetzdata -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" -o ./CLIProxyAPI ./cmd/server/
 
-FROM scratch
+RUN mkdir -p /image-root/data && touch /image-root/data/.keep && chown -R 1000:1000 /image-root/data
 
-COPY --from=builder ./app/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
+FROM alpine:3.21
+
+RUN addgroup -g 1000 -S app && adduser -D -H -u 1000 -G app app
+
+COPY --from=builder /app/CLIProxyAPI /app/CLIProxyAPI
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /image-root/data /data
 
-COPY config.example.yaml /CLIProxyAPI/config.example.yaml
+COPY config.example.yaml /app/config.example.yaml
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY run-as-user.sh /app/run-as-user.sh
 
-WORKDIR /CLIProxyAPI
+RUN chmod 0755 /app/CLIProxyAPI /app/docker-entrypoint.sh /app/run-as-user.sh && mkdir -p /data
+
+WORKDIR /app
 
 EXPOSE 8317
 
-ENV TZ=Asia/Shanghai
+ENV TZ=Asia/Shanghai \
+    WRITABLE_PATH=/data
 
-CMD ["/CLIProxyAPI/CLIProxyAPI", "-config", "/CLIProxyAPI/data/config.yaml"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

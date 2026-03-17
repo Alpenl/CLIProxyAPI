@@ -54,3 +54,97 @@ func TestClientCreateJob_SendsAuthAndPayload(t *testing.T) {
 		t.Fatalf("job.ID = %q, want job-1", job.ID)
 	}
 }
+
+func TestClientGetJob_SendsAuthAndParsesResponse(t *testing.T) {
+	var capturedAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/jobs/job-1" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		capturedAuth = r.Header.Get("X-Management-Secret")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"job": map[string]any{
+				"id":                 "job-1",
+				"status":             "running",
+				"requestedSuccesses": 2,
+				"successCount":       1,
+			},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, "service-secret", server.Client())
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	job, err := client.GetJob(context.Background(), "job-1")
+	if err != nil {
+		t.Fatalf("GetJob() error = %v", err)
+	}
+
+	if capturedAuth != "service-secret" {
+		t.Fatalf("auth header = %q, want service-secret", capturedAuth)
+	}
+	if job == nil {
+		t.Fatalf("job = nil, want value")
+	}
+	if job.Status != "running" {
+		t.Fatalf("job.Status = %q, want running", job.Status)
+	}
+	if job.SuccessCount != 1 {
+		t.Fatalf("job.SuccessCount = %d, want 1", job.SuccessCount)
+	}
+}
+
+func TestClientGetJob_NotFoundReturnsNil(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, "service-secret", server.Client())
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	job, err := client.GetJob(context.Background(), "missing")
+	if err != nil {
+		t.Fatalf("GetJob() error = %v", err)
+	}
+	if job != nil {
+		t.Fatalf("job = %#v, want nil", job)
+	}
+}
+
+func TestClientDownloadArchive_ReturnsBytes(t *testing.T) {
+	var capturedAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/jobs/job-1/archive" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		capturedAuth = r.Header.Get("X-Management-Secret")
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write([]byte("zip-bytes"))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, "service-secret", server.Client())
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	archive, err := client.DownloadArchive(context.Background(), "job-1")
+	if err != nil {
+		t.Fatalf("DownloadArchive() error = %v", err)
+	}
+
+	if capturedAuth != "service-secret" {
+		t.Fatalf("auth header = %q, want service-secret", capturedAuth)
+	}
+	if string(archive) != "zip-bytes" {
+		t.Fatalf("archive = %q, want zip-bytes", string(archive))
+	}
+}

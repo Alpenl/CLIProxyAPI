@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -141,6 +142,11 @@ type Server struct {
 	keepAliveOnTimeout func()
 	keepAliveHeartbeat chan struct{}
 	keepAliveStop      chan struct{}
+
+	replenishmentMu      sync.RWMutex
+	replenishmentManager any
+	replenishmentStop    chan struct{}
+	replenishmentDone    chan struct{}
 }
 
 // NewServer creates and initializes a new API server instance.
@@ -180,7 +186,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, configFilePath str
 	var requestLogger logging.RequestLogger
 	var toggle func(bool)
 	configDir := filepath.Dir(configFilePath)
-	logsDir := logging.ResolveLogDirectory(cfg)
+	logsDir := logging.ResolveLogDirectoryForConfigPath(cfg, configFilePath)
 	requestLogger = logging.NewFileRequestLogger(cfg.RequestLog, logsDir, configDir, cfg.ErrorLogsMaxFiles)
 	if requestLogger != nil {
 		engine.Use(middleware.RequestLoggingMiddleware(requestLogger))
@@ -222,12 +228,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, configFilePath str
 	if optionState.localPassword != "" {
 		s.mgmt.SetLocalPassword(optionState.localPassword)
 	}
-	logDir := logging.ResolveLogDirectory(cfg)
+	logDir := logging.ResolveLogDirectoryForConfigPath(cfg, configFilePath)
 	s.mgmt.SetLogDirectory(logDir)
 	if optionState.postAuthHook != nil {
 		s.mgmt.SetPostAuthHook(optionState.postAuthHook)
 	}
+	s.mgmt.SetReplenishmentCallbacks(s.replenishmentStatus, s.triggerReplenishment)
 	s.localPassword = optionState.localPassword
+	s.configureReplenishment()
 
 	// Setup routes
 	s.setupRoutes()
@@ -307,6 +315,8 @@ func (s *Server) registerManagementRoutes() {
 		protected.POST("/codex/import-files", s.mgmt.ImportCodexFiles)
 		protected.POST("/codex/cleanup-invalid", s.mgmt.CleanupInvalidCodexAccounts)
 		protected.DELETE("/codex/accounts/:name", s.mgmt.DeleteCodexAccount)
+		protected.GET("/replenishment/status", s.mgmt.GetReplenishmentStatus)
+		protected.POST("/replenishment/run", s.mgmt.RunReplenishment)
 	}
 }
 
@@ -423,6 +433,8 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to start HTTP server: server not initialized")
 	}
 
+	s.startReplenishmentLoop()
+
 	useTLS := s.cfg != nil && s.cfg.TLS.Enable
 	if useTLS {
 		cert := strings.TrimSpace(s.cfg.TLS.Cert)
@@ -462,6 +474,8 @@ func (s *Server) Stop(ctx context.Context) error {
 		default:
 		}
 	}
+
+	s.stopReplenishmentLoop()
 
 	// Shutdown the HTTP server.
 	if err := s.server.Shutdown(ctx); err != nil {
@@ -526,9 +540,12 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 	}
 
 	if oldCfg == nil || oldCfg.LoggingToFile != cfg.LoggingToFile || oldCfg.LogsMaxTotalSizeMB != cfg.LogsMaxTotalSizeMB {
-		if err := logging.ConfigureLogOutput(cfg); err != nil {
+		if err := logging.ConfigureLogOutputForConfigPath(cfg, s.configFilePath); err != nil {
 			log.Errorf("failed to reconfigure log output: %v", err)
 		}
+	}
+	if s.mgmt != nil {
+		s.mgmt.SetLogDirectory(logging.ResolveLogDirectoryForConfigPath(cfg, s.configFilePath))
 	}
 
 	if oldCfg == nil || oldCfg.UsageStatisticsEnabled != cfg.UsageStatisticsEnabled {
@@ -568,6 +585,9 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		s.mgmt.SetConfig(cfg)
 		s.mgmt.SetAuthManager(s.handlers.AuthManager)
 	}
+
+	s.configureReplenishment()
+	s.restartReplenishmentLoopIfRunning()
 
 	// Count client sources from configuration and auth store.
 	tokenStore := sdkAuth.GetTokenStore()

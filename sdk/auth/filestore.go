@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/fileperm"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 )
 
@@ -58,8 +59,12 @@ func (s *FileTokenStore) Save(ctx context.Context, auth *cliproxyauth.Auth) (str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err = os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("auth filestore: create dir failed: %w", err)
+	}
+	if err = fileperm.BestEffortChmod(dir, 0o755); err != nil {
+		return "", fmt.Errorf("auth filestore: chmod dir failed: %w", err)
 	}
 
 	// metadataSetter is a private interface for TokenStorage implementations that support metadata injection.
@@ -75,6 +80,9 @@ func (s *FileTokenStore) Save(ctx context.Context, auth *cliproxyauth.Auth) (str
 		if err = auth.Storage.SaveTokenToFile(path); err != nil {
 			return "", err
 		}
+		if err = fileperm.BestEffortChmod(path, 0o644); err != nil {
+			return "", fmt.Errorf("auth filestore: chmod storage file failed: %w", err)
+		}
 	case auth.Metadata != nil:
 		auth.Metadata["disabled"] = auth.Disabled
 		raw, errMarshal := json.Marshal(auth.Metadata)
@@ -85,7 +93,7 @@ func (s *FileTokenStore) Save(ctx context.Context, auth *cliproxyauth.Auth) (str
 			if jsonEqual(existing, raw) {
 				return path, nil
 			}
-			file, errOpen := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0o600)
+			file, errOpen := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0o644)
 			if errOpen != nil {
 				return "", fmt.Errorf("auth filestore: open existing failed: %w", errOpen)
 			}
@@ -96,12 +104,18 @@ func (s *FileTokenStore) Save(ctx context.Context, auth *cliproxyauth.Auth) (str
 			if errClose := file.Close(); errClose != nil {
 				return "", fmt.Errorf("auth filestore: close existing failed: %w", errClose)
 			}
+			if err = fileperm.BestEffortChmod(path, 0o644); err != nil {
+				return "", fmt.Errorf("auth filestore: chmod existing failed: %w", err)
+			}
 			return path, nil
 		} else if !os.IsNotExist(errRead) {
 			return "", fmt.Errorf("auth filestore: read existing failed: %w", errRead)
 		}
-		if errWrite := os.WriteFile(path, raw, 0o600); errWrite != nil {
+		if errWrite := os.WriteFile(path, raw, 0o644); errWrite != nil {
 			return "", fmt.Errorf("auth filestore: write file failed: %w", errWrite)
+		}
+		if err = fileperm.BestEffortChmod(path, 0o644); err != nil {
+			return "", fmt.Errorf("auth filestore: chmod file failed: %w", err)
 		}
 	default:
 		return "", fmt.Errorf("auth filestore: nothing to persist for %s", auth.ID)

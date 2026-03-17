@@ -123,9 +123,23 @@ func isDirWritable(dir string) bool {
 
 // ResolveLogDirectory determines the directory used for application logs.
 func ResolveLogDirectory(cfg *config.Config) string {
+	return resolveLogDirectory(cfg, "")
+}
+
+// ResolveLogDirectoryForConfigPath determines the log directory for a specific
+// config file location. When a config path is provided, logs are anchored next
+// to that config so Docker and Sealos can persist all user data under one root.
+func ResolveLogDirectoryForConfigPath(cfg *config.Config, configPath string) string {
+	return resolveLogDirectory(cfg, configPath)
+}
+
+func resolveLogDirectory(cfg *config.Config, configPath string) string {
 	logDir := "logs"
 	if base := util.WritablePath(); base != "" {
 		return filepath.Join(base, "logs")
+	}
+	if trimmed := strings.TrimSpace(configPath); trimmed != "" {
+		return filepath.Join(filepath.Dir(filepath.Clean(trimmed)), "logs")
 	}
 	if cfg == nil {
 		return logDir
@@ -146,12 +160,18 @@ func ResolveLogDirectory(cfg *config.Config) string {
 // When logsMaxTotalSizeMB > 0, a background cleaner removes the oldest log files in the logs directory
 // until the total size is within the limit.
 func ConfigureLogOutput(cfg *config.Config) error {
+	return ConfigureLogOutputForConfigPath(cfg, "")
+}
+
+// ConfigureLogOutputForConfigPath behaves like ConfigureLogOutput but resolves
+// the log directory against the provided config path when available.
+func ConfigureLogOutputForConfigPath(cfg *config.Config, configPath string) error {
 	SetupBaseLogger()
 
 	writerMu.Lock()
 	defer writerMu.Unlock()
 
-	logDir := ResolveLogDirectory(cfg)
+	logDir := ResolveLogDirectoryForConfigPath(cfg, configPath)
 
 	protectedPath := ""
 	if cfg.LoggingToFile {

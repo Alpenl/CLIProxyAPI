@@ -17,5 +17,5 @@ services:
     ports:
       - "8317:8317"
     volumes:
-      - ${CLI_PROXY_DATA_PATH:-./data}:/CLIProxyAPI/data
+      - ${CLI_PROXY_DATA_PATH:-./data}:/data
     restart: unless-stopped

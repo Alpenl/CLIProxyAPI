@@ -22,8 +22,8 @@ remote-management:
   secret-key: "change-this-management-key"
 
 # Directory that stores Codex OAuth JSON files.
-# You can import files here from the web console or copy them in directly.
-auth-dir: "~/.cli-proxy-api"
+# Docker/Sealos deployments should keep it under /data.
+auth-dir: "/data/auths"
 
 # Downstream clients authenticate with one of these keys.
 api-keys:

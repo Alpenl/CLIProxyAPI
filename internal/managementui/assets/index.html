@@ -25,6 +25,12 @@
         --radius-lg: 10px;
         --radius-md: 8px;
         --radius-sm: 6px;
+        --space-1: 6px;
+        --space-2: 10px;
+        --space-3: 14px;
+        --space-4: 18px;
+        --space-5: 24px;
+        --space-6: 32px;
         --mono: "IBM Plex Mono", "SFMono-Regular", "Cascadia Mono", monospace;
         --sans: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
       }
@@ -174,7 +180,7 @@
         margin: 0 auto;
         display: grid;
         grid-template-columns: 188px minmax(0, 1fr);
-        gap: 10px;
+        gap: var(--space-3);
         align-items: start;
       }
 
@@ -195,11 +201,11 @@
         height: fit-content;
         max-height: calc(100vh - 24px);
         overflow-y: auto;
-        padding: 10px;
+        padding: 12px;
         border-radius: var(--radius-lg);
         display: grid;
         align-content: start;
-        gap: 8px;
+        gap: var(--space-2);
       }
 
       .brand {
@@ -253,6 +259,19 @@
       .nav-link:hover {
         background: var(--bg-soft);
         border-color: var(--line);
+      }
+
+      .nav-link:focus-visible,
+      .button:focus-visible,
+      input[type="text"]:focus-visible,
+      input[type="password"]:focus-visible,
+      input[type="number"]:focus-visible,
+      input[type="file"]:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible,
+      input[type="checkbox"]:focus-visible {
+        outline: 2px solid rgba(22, 163, 74, 0.32);
+        outline-offset: 2px;
       }
 
       .nav-link.active {
@@ -464,12 +483,12 @@
         min-height: calc(100vh - 24px);
         display: grid;
         grid-template-rows: auto minmax(0, 1fr);
-        gap: 10px;
+        gap: var(--space-3);
         min-width: 0;
       }
 
       .page-header {
-        padding: 10px 12px;
+        padding: 12px 14px;
         border: 1px solid var(--line);
         border-radius: var(--radius-md);
         background: #fff;
@@ -524,7 +543,7 @@
 
       .view {
         display: grid;
-        gap: 10px;
+        gap: var(--space-3);
         min-height: 0;
         align-content: start;
       }
@@ -583,7 +602,7 @@
       .grid-4,
       .grid-2 {
         display: grid;
-        gap: 8px;
+        gap: var(--space-2);
       }
 
       .grid-4 {
@@ -602,11 +621,11 @@
 
       .panel,
       .table-shell {
-        padding: 10px;
+        padding: 12px;
       }
 
       .stat-card {
-        padding: 10px;
+        padding: 12px;
         border-radius: var(--radius-md);
       }
 
@@ -650,7 +669,7 @@
 
       .quota-toolbar-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 152px;
+        grid-template-columns: minmax(0, 1fr) 152px auto;
         gap: 8px;
         align-items: end;
       }
@@ -663,6 +682,15 @@
 
       .toolbar-cell.search {
         min-width: 0;
+      }
+
+      .quota-toolbar-actions {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .quota-toolbar-actions .button {
+        min-width: 116px;
       }
 
       .toolbar-meta {
@@ -915,8 +943,71 @@
         text-align: center;
       }
 
+      .quota-table td.account-col .row-title,
+      .quota-table td.account-col .row-subtitle {
+        text-align: left;
+      }
+
+      .quota-table td.account-col .row-subtitle {
+        min-height: 0;
+      }
+
       .file-picker {
         display: grid;
+        gap: 6px;
+      }
+
+      .import-workbench {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .import-guide {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .import-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-3);
+      }
+
+      .import-panel {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .import-panel-head,
+      .import-panel-body {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .result-stack {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .result-summary {
+        display: grid;
+        gap: var(--space-2);
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: #fbfcfd;
+      }
+
+      .result-summary-copy {
+        color: var(--text-soft);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .result-summary-pills {
+        display: flex;
+        flex-wrap: wrap;
         gap: 6px;
       }
 
@@ -1065,23 +1156,6 @@
         font-family: var(--mono);
       }
 
-      .overview-list {
-        display: grid;
-        gap: 6px;
-      }
-
-      .overview-row {
-        min-height: 36px;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 10px;
-        padding: 7px 8px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-sm);
-        background: #fff;
-      }
-
       .overview-label {
         color: var(--muted);
         font-size: 11px;
@@ -1103,16 +1177,268 @@
         color: var(--text-soft);
       }
 
+      .sidebar-summary {
+        gap: var(--space-2);
+      }
+
+      .summary-inline {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .summary-inline-item {
+        display: grid;
+        gap: 4px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: #fff;
+      }
+
+      .summary-inline-value {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        color: var(--text);
+      }
+
+      .summary-inline-value small {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0;
+      }
+
+      .summary-inline-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
       .quick-note {
         color: var(--muted);
         font-size: 11px;
         line-height: 1.5;
-        padding-top: 2px;
+      }
+
+      .dashboard-hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.75fr) minmax(280px, 0.95fr);
+        gap: var(--space-3);
+      }
+
+      .dashboard-primary {
+        display: grid;
+        gap: var(--space-3);
+        padding: 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8faf9 100%);
+        border-color: #dde5df;
+      }
+
+      .dashboard-primary.warn {
+        background: linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
+        border-color: #efd8ba;
+      }
+
+      .dashboard-primary.bad {
+        background: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+        border-color: #f0cccc;
+      }
+
+      .dashboard-primary-top {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-3);
+        align-items: start;
+      }
+
+      .dashboard-primary-title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.05em;
+      }
+
+      .dashboard-primary-description {
+        margin: 6px 0 0;
+        max-width: 58ch;
+        color: var(--text-soft);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .dashboard-metric-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .dashboard-inline-metric {
+        display: grid;
+        gap: 4px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.86);
+      }
+
+      .dashboard-inline-metric strong {
+        font-size: clamp(16px, 1.65vw, 22px);
+        font-weight: 600;
+        letter-spacing: -0.04em;
+        color: var(--text);
+        line-height: 1.25;
+        word-break: break-word;
+      }
+
+      .dashboard-inline-metric .helper {
+        margin: 0;
+      }
+
+      .dashboard-primary-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .dashboard-side-stack {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .dashboard-side-card {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .dashboard-side-card strong {
+        font-size: clamp(18px, 1.55vw, 22px);
+        font-weight: 600;
+        letter-spacing: -0.04em;
+        color: var(--text);
+        line-height: 1.25;
+        word-break: break-word;
+      }
+
+      .meta-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .quota-table th.account-col,
+      .quota-table td.account-col {
+        text-align: left;
+      }
+
+      .quota-table th.actions-col-head,
+      .quota-table td.actions-cell {
+        text-align: center;
+      }
+
+      .config-stack {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .config-section-note {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .config-panel.emphasis {
+        background: linear-gradient(180deg, #ffffff 0%, #f8faf9 100%);
+        border-color: #dde5df;
+      }
+
+      .config-advanced {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: #fff;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .config-advanced summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        padding: 12px;
+        cursor: pointer;
+        list-style: none;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .config-advanced summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .config-advanced summary::after {
+        content: "+";
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .config-advanced[open] summary::after {
+        content: "-";
+      }
+
+      .config-advanced-body {
+        display: grid;
+        gap: var(--space-3);
+        padding: 0 12px 12px;
+        border-top: 1px solid var(--line);
+      }
+
+      .config-save-panel {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .empty-state-card {
+        display: grid;
+        gap: var(--space-3);
+        align-self: start;
+      }
+
+      .empty-state-copy {
+        display: grid;
+        gap: var(--space-1);
+        max-width: 58ch;
+      }
+
+      .empty-state-copy p {
+        margin: 0;
+        color: var(--text-soft);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .empty-state-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
       }
 
       @media (max-width: 1200px) {
         .grid-4 {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .dashboard-hero-grid {
+          grid-template-columns: 1fr;
         }
       }
 
@@ -1157,11 +1483,22 @@
         .quota-head {
           grid-template-columns: 1fr;
         }
+
+        .quota-toolbar-grid {
+          grid-template-columns: minmax(0, 1fr) 152px;
+        }
+
+        .quota-toolbar-actions {
+          grid-column: 1 / -1;
+        }
       }
 
       @media (max-width: 760px) {
         .grid-4,
         .grid-2,
+        .summary-inline,
+        .dashboard-metric-strip,
+        .import-grid,
         .config-grid,
         .config-form-grid,
         .config-kv {
@@ -1175,6 +1512,10 @@
 
         .quota-toolbar-grid {
           grid-template-columns: 1fr;
+        }
+
+        .quota-toolbar-actions {
+          justify-content: flex-start;
         }
 
         .file-picker-row,
@@ -1204,7 +1545,7 @@
         <div class="auth-copy">
           <div class="section-kicker">Codex 专用代理</div>
           <h1 class="auth-title">管理登录</h1>
-          <p class="auth-description">管理密钥只在登录页输入一次。验证通过后自动进入后台，并仅保存在当前浏览器中。</p>
+          <p class="auth-description">输入一次管理密钥即可进入后台。密钥只保存在当前浏览器，下次会自动尝试登录。</p>
         </div>
 
         <form class="auth-form" id="auth-form">
@@ -1218,7 +1559,7 @@
           </div>
         </form>
 
-        <div class="auth-status" id="auth-status">输入一次管理密钥后会保存在当前浏览器，下次会自动尝试进入后台。</div>
+        <div class="auth-status" id="auth-status">输入管理密钥后会自动进入后台；已保存的密钥下次会自动重试。</div>
       </section>
     </section>
 
@@ -1232,7 +1573,7 @@
           <section class="brand">
             <div class="brand-kicker">Codex 专用代理</div>
             <div class="brand-title">Codex 控制台</div>
-            <div class="brand-note">保留账号、额度、导入、日志和最小必要配置管理。</div>
+            <div class="brand-note">先看账号池健康，再处理额度、导入结果和关键配置。</div>
           </section>
 
           <nav class="nav" aria-label="主导航">
@@ -1243,29 +1584,25 @@
             <a class="nav-link" data-route-link="logs" href="#/logs">操作日志</a>
           </nav>
 
-          <section class="sidebar-group">
+          <section class="sidebar-group sidebar-summary">
             <div class="section-head">
-              <h2>当前概览</h2>
+              <h2>运行快照</h2>
             </div>
-            <div class="overview-list">
-              <div class="overview-row">
-                <div class="overview-label">账号数量</div>
-                <div class="overview-value" id="quick-accounts">0</div>
+            <div class="overview-list summary-inline">
+              <div class="summary-inline-item">
+                <div class="overview-label">可用 / 总数</div>
+                <div class="summary-inline-value"><span id="quick-enabled">0</span><small>/ <span id="quick-accounts">0</span></small></div>
               </div>
-              <div class="overview-row">
-                <div class="overview-label">可用账号</div>
-                <div class="overview-value" id="quick-enabled">0</div>
-              </div>
-              <div class="overview-row">
+              <div class="summary-inline-item">
                 <div class="overview-label">累计请求</div>
-                <div class="overview-value" id="quick-requests">0</div>
+                <div class="summary-inline-value" id="quick-requests">0</div>
               </div>
-              <div class="overview-row">
-                <div class="overview-label">最近同步</div>
-                <div class="overview-value sync" id="quick-sync">未同步</div>
-              </div>
-              <div class="quick-note">这里保留最核心的运行数字，详细用量和操作结果在各自页面展开。</div>
             </div>
+            <div class="summary-inline-foot">
+              <div class="overview-label">最近同步</div>
+              <div class="overview-value sync" id="quick-sync">未同步</div>
+            </div>
+            <div class="quick-note">这里只保留最关键的运行信号，详细排查放到具体页面。</div>
           </section>
         </aside>
 
@@ -1280,8 +1617,7 @@
               </div>
             </div>
             <div class="page-actions">
-              <button class="button button-secondary" data-action="refresh-overview" type="button">手动刷新</button>
-              <button class="button button-danger" data-action="cleanup-invalid" type="button">清理失效账号</button>
+              <button class="button button-secondary" data-action="refresh-overview" type="button">刷新整体状态</button>
             </div>
           </header>
 
@@ -1294,29 +1630,29 @@
       const STORAGE_KEY = "codex-console.management-key";
       const IMPORT_PATH_KEY = "codex-console.import-path";
       const AUTO_CLEANUP_KEY = "codex-console.auto-cleanup";
-      const DEFAULT_IMPORT_PATH = "/home/alpen/DEV/cdx-rt/output";
+      const DEFAULT_IMPORT_PATH = "/data/import";
       const QUOTA_AUTO_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
       const ROUTES = {
         dashboard: {
           title: "仪表盘",
-          description: "查看账号池概况、请求用量和最近操作。",
+          description: "先判断账号池是否健康，再决定是否刷新、清理或补号。",
         },
         quota: {
           title: "账号额度",
-          description: "按账号扫描状态、套餐和 5H / 7D 可用额度。",
+          description: "按账号查看套餐、健康状态和 5H / 7D 剩余额度。",
         },
         import: {
           title: "账号导入",
-          description: "批量导入本地导出的 Codex 账号文件，并查看导入和清理结果。",
+          description: "从服务器目录或浏览器批量导入 Codex 账号文件。",
         },
         config: {
           title: "配置管理",
-          description: "维护监听地址、管理密钥、客户端 API Key、账号目录和自动补号参数。",
+          description: "先维护基础接入，再按需展开补号与进阶运行参数。",
         },
         logs: {
           title: "操作日志",
-          description: "集中查看本地操作记录，追踪导入、清理、删除和刷新行为。",
+          description: "查看本地操作记录，确认刚才发生了什么。",
         },
       };
 
@@ -1344,7 +1680,7 @@
             serviceToken: "",
             serviceTokenConfigured: false,
           },
-          authDir: "./auths",
+          authDir: "/data/auths",
           apiKeysText: "",
           proxyUrl: "",
           loggingToFile: false,
@@ -1376,6 +1712,9 @@
         accounts: [],
         quotaByAccount: {},
         usage: null,
+        replenishmentStatus: null,
+        replenishmentLoading: false,
+        replenishmentError: "",
         lastSync: "",
         lastImportResult: null,
         lastCleanupResult: null,
@@ -1650,6 +1989,61 @@
         return message || "请求失败";
       }
 
+      function formatQuotaErrorCopy(message) {
+        const raw = String(message || "").trim();
+        if (!raw) {
+          return {
+            summary: "刷新失败，请稍后重试",
+            detail: "",
+          };
+        }
+
+        let detail = raw
+          .replace(/^HTTP\s+/i, "")
+          .replace(/^\d+\s+/, "")
+          .trim();
+
+        const parsed = parseJSONValue(detail);
+        if (parsed && typeof parsed === "object") {
+          if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+            detail = parsed.detail.trim();
+          } else if (typeof parsed.error === "string" && parsed.error.trim()) {
+            detail = parsed.error.trim();
+          } else if (typeof parsed.message === "string" && parsed.message.trim()) {
+            detail = parsed.message.trim();
+          }
+        } else if (typeof parsed === "string" && parsed.trim()) {
+          detail = parsed.trim();
+        }
+
+        const normalized = detail.toLowerCase();
+        if (normalized.includes("could not parse your authentication token") || normalized.includes("please try signing in again")) {
+          return {
+            summary: "登录态已失效，请重新导入账号",
+            detail: raw,
+          };
+        }
+
+        if (normalized.includes("缺少 chatgpt 账号 id") || normalized.includes("缺少账号 id")) {
+          return {
+            summary: "缺少账号 ID，暂时无法查询额度",
+            detail: raw,
+          };
+        }
+
+        if (normalized.includes("暂无额度数据")) {
+          return {
+            summary: "接口暂未返回额度数据",
+            detail: raw,
+          };
+        }
+
+        return {
+          summary: detail || "刷新失败，请稍后重试",
+          detail: raw,
+        };
+      }
+
       function formatQuotaResetLabel(window) {
         if (!window || typeof window !== "object") return "--";
 
@@ -1854,6 +2248,46 @@
         };
       }
 
+      function dashboardPriorityState(summary, snapshot) {
+        if (!summary.total) {
+          return {
+            level: "warn",
+            pillClass: "warn",
+            pillLabel: "等待导入",
+            title: "还没有账号可供路由",
+            description: "先导入账号文件，再检查额度和自动补号设置。完成导入后，这里会开始显示账号池健康情况。",
+          };
+        }
+
+        if (snapshot.deficit > 0) {
+          return {
+            level: "bad",
+            pillClass: "bad",
+            pillLabel: "需要补号",
+            title: `账号池低于目标值 ${formatCount(snapshot.deficit)}`,
+            description: "当前可用账号不足，建议先补到目标值，再继续观察额度刷新和异常清理结果。",
+          };
+        }
+
+        if (summary.attention > 0) {
+          return {
+            level: "warn",
+            pillClass: "warn",
+            pillLabel: "需要处理",
+            title: `有 ${formatCount(summary.attention)} 个账号待处理`,
+            description: "主链路仍可使用，但建议尽快清理异常账号或逐个检查失败原因，避免后续可用账号继续下降。",
+          };
+        }
+
+        return {
+          level: "good",
+          pillClass: "ok",
+          pillLabel: "运行稳定",
+          title: "账号池当前可继续稳定使用",
+          description: "当前没有明显阻塞项。维持定期刷新即可，必要时再执行清理或手动补号。",
+        };
+      }
+
       function usageSummary() {
         const usage = state.usage && state.usage.usage ? state.usage.usage : null;
         const failedRequests = state.usage ? Number(state.usage.failed_requests || 0) : 0;
@@ -1954,6 +2388,9 @@
         state.accounts = [];
         state.quotaByAccount = {};
         state.usage = null;
+        state.replenishmentStatus = null;
+        state.replenishmentLoading = false;
+        state.replenishmentError = "";
         state.lastSync = "";
         state.lastImportResult = null;
         state.lastCleanupResult = null;
@@ -2161,13 +2598,22 @@
 
         setBusy(true);
         try {
-          const [accountsPayload, usagePayload] = await Promise.all([
+          const [accountsPayload, usagePayload, replenishmentPayload] = await Promise.all([
             api("/v0/management/codex/accounts"),
             api("/v0/management/usage"),
+            api("/v0/management/replenishment/status").catch((error) => ({ __error: error })),
           ]);
 
           state.accounts = accountsPayload.accounts || [];
           state.usage = usagePayload;
+          if (replenishmentPayload && replenishmentPayload.__error) {
+            state.replenishmentStatus = null;
+            state.replenishmentError = replenishmentPayload.__error.message || "补号状态读取失败";
+          } else {
+            state.replenishmentStatus = replenishmentPayload && replenishmentPayload.replenishment ? replenishmentPayload.replenishment : null;
+            state.replenishmentError = "";
+          }
+          state.replenishmentLoading = false;
           state.lastSync = new Date().toISOString();
           syncQuotaCache();
           renderApp();
@@ -2178,6 +2624,60 @@
             addLog(`刷新概览失败：${error.message}`, "error");
           }
           throw error;
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function loadReplenishmentStatus(options = {}) {
+        if (!state.key) {
+          state.replenishmentStatus = null;
+          state.replenishmentError = "";
+          state.replenishmentLoading = false;
+          renderApp();
+          return null;
+        }
+
+        state.replenishmentLoading = true;
+        renderApp();
+        try {
+          const payload = await api("/v0/management/replenishment/status");
+          state.replenishmentStatus = payload.replenishment || null;
+          state.replenishmentError = "";
+          if (!options.silentLog) {
+            addLog("已刷新自动补号状态");
+          }
+          renderApp();
+          return state.replenishmentStatus;
+        } catch (error) {
+          state.replenishmentStatus = null;
+          state.replenishmentError = error.message || "补号状态读取失败";
+          if (!options.silentLog) {
+            addLog(`读取自动补号状态失败：${state.replenishmentError}`, "error");
+          }
+          renderApp();
+          throw error;
+        } finally {
+          state.replenishmentLoading = false;
+          renderApp();
+        }
+      }
+
+      async function runReplenishment() {
+        if (!ensureManagementKey("手动补号")) return;
+
+        setBusy(true);
+        try {
+          const payload = await api("/v0/management/replenishment/run", {
+            method: "POST",
+          });
+          state.replenishmentStatus = payload.replenishment || null;
+          state.replenishmentError = "";
+          renderApp();
+          addLog("已触发补到目标值任务");
+          await loadOverview({ silentError: true });
+        } catch (error) {
+          addLog(`触发补号失败：${error.message}`, "error");
         } finally {
           setBusy(false);
         }
@@ -2378,6 +2878,7 @@
         const account = (state.accounts || []).find((item) => item && item.name === name);
         if (!account) return;
         const previousQuota = state.quotaByAccount[name] || null;
+        const attemptAt = Date.now();
 
         state.quotaByAccount[name] = {
           status: previousQuota && Array.isArray(previousQuota.windows) && previousQuota.windows.length ? "success" : "loading",
@@ -2395,7 +2896,7 @@
             status: "success",
             windows: quota.windows || [],
             planType: quota.planType || null,
-            fetchedAt: Date.now(),
+            fetchedAt: attemptAt,
             refreshing: false,
             lastError: "",
           };
@@ -2405,6 +2906,8 @@
           }
           return true;
         } catch (error) {
+          const errorMessage = error && error.message ? error.message : "未知错误";
+          const errorCopy = formatQuotaErrorCopy(errorMessage);
           const fallbackWindows = previousQuota && Array.isArray(previousQuota.windows) ? previousQuota.windows : [];
           const fallbackPlanType = normalizePlanType((previousQuota && previousQuota.planType) || (account && account.id_token && account.id_token.plan_type));
           if (fallbackWindows.length) {
@@ -2412,24 +2915,24 @@
               status: "success",
               windows: fallbackWindows,
               planType: fallbackPlanType,
-              fetchedAt: previousQuota && previousQuota.fetchedAt ? previousQuota.fetchedAt : 0,
+              fetchedAt: attemptAt,
               refreshing: false,
-              lastError: error.message || "未知错误",
+              lastError: errorCopy.summary,
             };
           } else {
             state.quotaByAccount[name] = {
               status: "error",
               windows: [],
               planType: fallbackPlanType,
-              error: error.message || "未知错误",
-              fetchedAt: previousQuota && previousQuota.fetchedAt ? previousQuota.fetchedAt : 0,
+              error: errorMessage,
+              fetchedAt: attemptAt,
               refreshing: false,
-              lastError: error.message || "未知错误",
+              lastError: errorCopy.summary,
             };
           }
           renderApp();
           if (!options.silentLog) {
-            addLog(`刷新 ${name} 的额度失败：${error.message}`, "error");
+            addLog(`刷新 ${name} 的额度失败：${errorCopy.summary}`, "error");
           }
           return false;
         }
@@ -2625,16 +3128,18 @@
           return '<div class="quota-placeholder">未连接</div>';
         }
         if (!resolveCodexAccountId(account)) {
-          return '<div class="cell-message error">缺少账号 ID</div>';
+          const copy = formatQuotaErrorCopy("缺少账号 ID");
+          return `<div class="cell-message error" title="${escapeHTML(copy.detail || copy.summary)}">${escapeHTML(copy.summary)}</div>`;
         }
         if (!quota || quota.status === "idle") {
-          return '<div class="quota-placeholder">未刷新</div>';
+          return '<div class="quota-placeholder">等待刷新</div>';
         }
         if (quota.status === "loading" && (!Array.isArray(quota.windows) || !quota.windows.length)) {
-          return '<div class="quota-placeholder">刷新中...</div>';
+          return '<div class="quota-placeholder">正在拉取额度...</div>';
         }
         if (quota.status === "error") {
-          return `<div class="cell-message error">${escapeHTML(quota.error || "刷新失败")}</div>`;
+          const copy = formatQuotaErrorCopy(quota.error || "刷新失败");
+          return `<div class="cell-message error" title="${escapeHTML(copy.detail || copy.summary)}">${escapeHTML(copy.summary)}</div>`;
         }
 
         const windows = quotaWindowsForDisplay(account, quota);
@@ -2659,6 +3164,87 @@
             <div class="stat-value${isSmall ? " small" : ""}">${escapeHTML(value)}</div>
             ${helper ? `<div class="helper" style="margin-top:8px;">${escapeHTML(helper)}</div>` : ""}
           </article>
+        `;
+      }
+
+      function replenishmentSnapshot() {
+        const status = state.replenishmentStatus && typeof state.replenishmentStatus === "object" ? state.replenishmentStatus : {};
+        const pool = status.pool && typeof status.pool === "object" ? status.pool : {};
+        const healthy = Number(pool.healthy || 0);
+        const warming = Number(pool.warming || 0);
+        const reserved = Number(pool.reserved || 0);
+        return {
+          configured: Boolean(status.configured),
+          serviceReady: Boolean(status.serviceReady),
+          enabled: Boolean(status.enabled),
+          target: Number(status.targetAccountCount || 0),
+          deficit: Number(status.deficit || 0),
+          usable: healthy + warming,
+          healthy,
+          warming,
+          cooling: Number(pool.cooling || 0),
+          invalid: Number(pool.invalid || 0),
+          reserved,
+          currentJob: status.currentJob || null,
+          failureCount: Number(status.failureCount || 0),
+          nextAttemptAt: status.nextAttemptAt || "",
+        };
+      }
+
+      function renderReplenishmentPanel() {
+        const snapshot = replenishmentSnapshot();
+        const currentJob = snapshot.currentJob;
+        const statusText = state.replenishmentLoading
+          ? "正在读取补号状态。"
+          : (state.replenishmentError || (
+            !snapshot.configured
+              ? "要启用自动补号，先在配置管理里填写 cdx-rt 服务地址和服务密钥。"
+              : (snapshot.enabled
+                ? "账号低于目标值时会自动补号。"
+                : "当前不会自动补号，需要时可手动补到目标值。")
+          ));
+        const jobLabel = currentJob
+          ? `当前任务 ${currentJob.status || "--"}，目标 ${currentJob.requestedSuccesses || 0}`
+          : "当前没有补号任务";
+        const nextAttemptLabel = snapshot.nextAttemptAt ? `${formatRelativeTime(snapshot.nextAttemptAt)} · ${formatTime(snapshot.nextAttemptAt)}` : "正常";
+
+        return `
+          <section class="table-shell">
+            <div class="table-head">
+              <div>
+                <div class="section-kicker">自动补号</div>
+                <div class="table-title">自动补号状态</div>
+                <div class="helper" style="margin-top:6px;">${escapeHTML(statusText)}</div>
+              </div>
+              <div class="button-row">
+                <button class="button button-secondary" data-action="refresh-replenishment" type="button">${state.replenishmentLoading ? "刷新中..." : "刷新补号状态"}</button>
+              </div>
+            </div>
+            <section class="dashboard-metric-strip">
+              <div class="dashboard-inline-metric">
+                <div class="overview-label">目标账号</div>
+                <strong>${formatCount(snapshot.target)}</strong>
+                <div class="helper">当前配置值</div>
+              </div>
+              <div class="dashboard-inline-metric">
+                <div class="overview-label">可用账号</div>
+                <strong>${formatCount(snapshot.usable)}</strong>
+                <div class="helper">健康 + 预热</div>
+              </div>
+              <div class="dashboard-inline-metric">
+                <div class="overview-label">下一次尝试</div>
+                <strong>${escapeHTML(nextAttemptLabel)}</strong>
+                <div class="helper">${snapshot.failureCount ? `累计失败 ${formatCount(snapshot.failureCount)} 次` : "当前没有重试压力"}</div>
+              </div>
+            </section>
+            <div class="meta-strip" style="margin-top:12px;">
+              <span class="small-pill">${snapshot.serviceReady ? "补号服务已就绪" : (snapshot.configured ? "补号服务待就绪" : "补号服务未配置")}</span>
+              <span class="small-pill">${snapshot.enabled ? "当前为自动模式" : "当前为手动模式"}</span>
+              <span class="small-pill">${escapeHTML(jobLabel)}</span>
+              <span class="small-pill">当前缺口 ${formatCount(snapshot.deficit)}${snapshot.reserved ? `，含预留 ${formatCount(snapshot.reserved)}` : ""}</span>
+              <span class="small-pill">冷却 ${formatCount(snapshot.cooling)} / 异常 ${formatCount(snapshot.invalid)}</span>
+            </div>
+          </section>
         `;
       }
 
@@ -2696,7 +3282,7 @@
       function renderLogList(limit) {
         const logs = state.logs.slice(0, limit);
         if (!logs.length) {
-          return '<div class="empty-box">当前还没有操作日志。</div>';
+          return '<div class="empty-box">还没有操作记录。执行导入、刷新或清理后，这里会显示结果。</div>';
         }
 
         return `
@@ -2713,7 +3299,7 @@
 
       function renderLogsTable() {
         if (!state.logs.length) {
-          return '<div class="empty-box">当前还没有操作日志。</div>';
+          return '<div class="empty-box">还没有操作记录。执行导入、刷新或清理后，这里会显示结果。</div>';
         }
 
         return `
@@ -2772,6 +3358,21 @@
         `;
       }
 
+      function renderResultSummary(title, description, pills) {
+        const items = Array.isArray(pills) ? pills.filter(Boolean) : [];
+        return `
+          <div class="result-summary">
+            <div>
+              <div class="table-title">${escapeHTML(title)}</div>
+              <div class="result-summary-copy">${escapeHTML(description)}</div>
+            </div>
+            <div class="result-summary-pills">
+              ${items.map((item) => `<span class="small-pill">${escapeHTML(item)}</span>`).join("")}
+            </div>
+          </div>
+        `;
+      }
+
       function formatLogLevel(level) {
         const normalized = String(level || "info").toLowerCase();
         if (normalized === "error") {
@@ -2790,27 +3391,81 @@
         const summary = accountSummary();
         const usage = usageSummary();
         const syncLabel = state.lastSync ? formatTime(state.lastSync) : "未同步";
+        const syncRelativeLabel = state.lastSync ? formatRelativeTime(state.lastSync) : "未同步";
+        const snapshot = replenishmentSnapshot();
+        const priority = dashboardPriorityState(summary, snapshot);
         const planTags = Object.keys(summary.planCounts).map((key) => {
           const count = summary.planCounts[key];
           return `<span class="small-pill">${escapeHTML(key)} ${formatCount(count)}</span>`;
         }).join("");
+        const modeLabel = !snapshot.configured
+          ? "补号服务未配置"
+          : (snapshot.enabled ? "自动补号已启用" : "当前为手动补号");
+        const currentJobLabel = snapshot.currentJob
+          ? `${snapshot.currentJob.status || "--"} / 目标 ${snapshot.currentJob.requestedSuccesses || 0}`
+          : "当前没有补号任务";
 
         return `
-          <section class="grid-4">
-            ${metricCard("账号总数", formatCount(summary.total), "当前已加载账号文件", false)}
-            ${metricCard("可用账号", formatCount(summary.enabled), "未标记异常", false)}
-            ${metricCard("异常账号", formatCount(summary.attention), "建议手动清理", false)}
-            ${metricCard("最近同步", syncLabel, state.key ? "手动刷新后更新" : "保存密钥后开始同步", true)}
+          <section class="dashboard-hero-grid">
+            <article class="panel dashboard-primary ${priority.level}">
+              <div class="dashboard-primary-top">
+                <div>
+                  <div class="section-kicker">当前重点</div>
+                  <h2 class="dashboard-primary-title">${escapeHTML(priority.title)}</h2>
+                  <p class="dashboard-primary-description">${escapeHTML(priority.description)}</p>
+                </div>
+                <span class="status-dot-pill ${priority.pillClass}"><span class="dot"></span>${escapeHTML(priority.pillLabel)}</span>
+              </div>
+              <section class="dashboard-metric-strip">
+                <div class="dashboard-inline-metric">
+                  <div class="overview-label">可用账号</div>
+                  <strong>${formatCount(summary.enabled)}</strong>
+                  <div class="helper">当前可继续路由的账号</div>
+                </div>
+                <div class="dashboard-inline-metric">
+                  <div class="overview-label">异常账号</div>
+                  <strong>${formatCount(summary.attention)}</strong>
+                  <div class="helper">建议优先清理或排查</div>
+                </div>
+                <div class="dashboard-inline-metric">
+                  <div class="overview-label">当前缺口</div>
+                  <strong>${formatCount(snapshot.deficit)}</strong>
+                  <div class="helper">${snapshot.target ? `目标 ${formatCount(snapshot.target)} 个账号` : "尚未设置目标值"}</div>
+                </div>
+              </section>
+              <div class="meta-strip">
+                ${planTags || '<span class="small-pill">还没有套餐分布数据</span>'}
+                <span class="small-pill">${escapeHTML(modeLabel)}</span>
+                <span class="small-pill">${escapeHTML(currentJobLabel)}</span>
+                <span class="small-pill">${escapeHTML(state.lastSync ? `最近同步 ${syncRelativeLabel}` : "还没有同步结果")}</span>
+              </div>
+              <div class="dashboard-primary-actions">
+                <button class="button button-secondary" data-action="refresh-overview" type="button">刷新整体状态</button>
+                <button class="button button-danger" data-action="cleanup-invalid" type="button">清理异常账号</button>
+                <button class="button button-primary" data-action="run-replenishment" type="button">补到目标值</button>
+              </div>
+            </article>
+
+            <section class="dashboard-side-stack">
+              <article class="panel dashboard-side-card">
+                <div class="section-kicker">请求概览</div>
+                <strong>${formatCount(usage.totalRequests)}</strong>
+                <div class="helper">累计请求数，含成功与失败。</div>
+              </article>
+              <article class="panel dashboard-side-card">
+                <div class="section-kicker">最近同步</div>
+                <strong>${escapeHTML(syncRelativeLabel)}</strong>
+                <div class="helper">${escapeHTML(state.lastSync ? syncLabel : "点击“刷新整体状态”开始同步。")}</div>
+              </article>
+              <article class="panel dashboard-side-card">
+                <div class="section-kicker">补号模式</div>
+                <strong>${escapeHTML(snapshot.enabled ? "自动模式" : "手动模式")}</strong>
+                <div class="helper">${escapeHTML(!snapshot.configured ? "先配置 cdx-rt 服务后才能真正启用自动补号。" : currentJobLabel)}</div>
+              </article>
+            </section>
           </section>
 
-          <section class="panel">
-            <div class="section-kicker">账号池</div>
-            <h3>状态总览</h3>
-            <div class="helper" style="margin-top:6px;">这套界面只保留 Codex 管理能力，重点展示账号状态、额度检查和导入结果。</div>
-            <div class="summary-row">
-              ${planTags || '<span class="small-pill">暂无套餐分布</span>'}
-            </div>
-          </section>
+          ${renderReplenishmentPanel()}
 
           <section class="grid-2">
             <article class="table-shell">
@@ -2851,7 +3506,7 @@
 
         return `
           <tr>
-            <td>
+            <td class="account-col">
               <div class="row-title">${escapeHTML(account.email || account.label || account.name || "--")}</div>
               <div class="row-subtitle">${escapeHTML(account.name || "--")}</div>
             </td>
@@ -2862,7 +3517,7 @@
               <div>${escapeHTML(formatRelativeTime(refreshedAt))}</div>
               <div class="row-subtitle">${escapeHTML(formatTime(refreshedAt))}</div>
             </td>
-            <td>
+            <td class="actions-cell">
               <div class="actions-col actions-grid">
                 <button class="button button-secondary" data-refresh-quota="${escapeHTML(account.name || "")}" type="button">刷新</button>
                 <button class="button button-danger" data-delete="${escapeHTML(account.name || "")}" type="button">删除</button>
@@ -2878,14 +3533,21 @@
 
         if (!accounts.length) {
           return `
-            <section class="table-shell">
-              <div class="table-head">
-                <div>
-                  <div class="section-kicker">账号额度</div>
-                  <div class="table-title">账号清单</div>
-                </div>
+            <section class="panel empty-state-card">
+              <div class="empty-state-copy">
+                <div class="section-kicker">账号额度</div>
+                <h3>还没有可检查额度的账号</h3>
+                <p>先去“账号导入”页导入目录或上传文件。导入完成后，这里会显示套餐、健康状态和 5H / 7D 剩余额度。</p>
               </div>
-              <div class="empty-box">当前没有账号数据。先导入账号或保存管理密钥后刷新概览。</div>
+              <div class="meta-strip">
+                <span class="small-pill">导入后才会开始额度巡检</span>
+                <span class="small-pill">plus/team 显示 5H + 7D</span>
+                <span class="small-pill">free 仅显示 7D</span>
+              </div>
+              <div class="empty-state-actions">
+                <a class="button button-primary" href="#/import">去导入账号</a>
+                <button class="button button-secondary" data-action="refresh-overview" type="button">刷新整体状态</button>
+              </div>
             </section>
           `;
         }
@@ -2896,7 +3558,7 @@
               <div class="quota-head-copy">
                 <div class="section-kicker">账号额度</div>
                 <div class="table-title">账号清单</div>
-                <div class="helper" style="margin-top:6px;">按邮箱、文件名和套餐筛选，plus/team 显示 5H + 7D，free 仅显示 7D。</div>
+                <div class="helper" style="margin-top:6px;">先筛出需要排查的账号，再决定逐个刷新还是批量刷新。</div>
               </div>
               <div class="quota-toolbar-grid">
                 <label class="toolbar-cell search">
@@ -2911,14 +3573,16 @@
                     <option value="attention" ${state.quotaStatusFilter === "attention" ? "selected" : ""}>仅异常</option>
                   </select>
                 </label>
+                <div class="toolbar-cell quota-toolbar-actions">
+                  <button class="button button-secondary" data-action="refresh-quota-all" type="button" ${state.quotaRefreshInFlight ? "disabled" : ""}>${state.quotaRefreshInFlight ? "正在批量刷新..." : "批量刷新额度"}</button>
+                </div>
               </div>
             </div>
             <div class="toolbar-meta">
               <span class="small-pill">已显示 ${formatCount(filtered.length)} / ${formatCount(accounts.length)}</span>
               <span class="small-pill">plus/team 显示 5H + 7D，free 仅显示 7D</span>
-              <span class="small-pill">每 1 小时自动刷新一次</span>
-              <span class="small-pill">${escapeHTML(state.quotaLastBulkRefreshAt ? `上次额度刷新 ${formatRelativeTime(state.quotaLastBulkRefreshAt)}` : "额度尚未批量刷新")}</span>
-              <button class="button button-secondary" data-action="refresh-quota-all" type="button" ${state.quotaRefreshInFlight ? "disabled" : ""}>${state.quotaRefreshInFlight ? "刷新中..." : "刷新全部额度"}</button>
+              <span class="small-pill">每 1 小时自动巡检一次</span>
+              <span class="small-pill">${escapeHTML(state.quotaLastBulkRefreshAt ? `最近批量刷新 ${formatRelativeTime(state.quotaLastBulkRefreshAt)}` : "还没有批量刷新过")}</span>
             </div>
             <div class="table-wrap quota-table-wrap">
               <table class="quota-table">
@@ -2932,19 +3596,19 @@
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>账号</th>
+                    <th class="account-col">账号</th>
                     <th>套餐</th>
                     <th>健康状态</th>
                     <th>额度</th>
                     <th>最近刷新</th>
-                    <th>操作</th>
+                    <th class="actions-col-head">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${filtered.length ? filtered.map(quotaRow).join("") : `
                     <tr>
                       <td colspan="6">
-                        <div class="empty-box">当前筛选条件下没有账号。</div>
+                        <div class="empty-box">当前筛选条件下没有匹配账号。</div>
                       </td>
                     </tr>
                   `}
@@ -2958,266 +3622,337 @@
       function renderImportView() {
         const importResult = state.lastImportResult;
         const cleanupResult = state.lastCleanupResult;
+        const importSummary = importResult
+          ? renderResultSummary(
+            "最近一次导入",
+            `新增 ${formatCount(importResult.imported || 0)} 个账号，跳过 ${formatCount(importResult.skipped || 0)} 个文件。当前账号池共 ${formatCount((importResult.accounts || []).length)} 个账号。`,
+            [
+              `新增 ${formatCount(importResult.imported || 0)}`,
+              `跳过 ${formatCount(importResult.skipped || 0)}`,
+              `当前账号 ${formatCount((importResult.accounts || []).length)}`,
+              importResult.cleanup ? `自动清理移除 ${formatCount(importResult.cleanup.removed || 0)}` : "未执行自动清理",
+            ],
+          )
+          : "";
+        const cleanupSummary = cleanupResult
+          ? renderResultSummary(
+            "最近一次清理",
+            `移除 ${formatCount(cleanupResult.removed || 0)} 个账号，保留 ${formatCount(cleanupResult.kept || 0)} 个，期间刷新 ${formatCount(cleanupResult.refreshed || 0)} 个账号。`,
+            [
+              `已移除 ${formatCount(cleanupResult.removed || 0)}`,
+              `已刷新 ${formatCount(cleanupResult.refreshed || 0)}`,
+              `保留 ${formatCount(cleanupResult.kept || 0)}`,
+              `当前账号 ${formatCount((cleanupResult.accounts || state.accounts || []).length)}`,
+            ],
+          )
+          : "";
+        const importPendingSummary = renderResultSummary(
+          "等待第一次导入",
+          "执行一次目录导入或文件上传后，这里会显示新增、跳过和自动清理结果。",
+          [
+            state.autoCleanup ? "导入后会顺带清理异常账号" : "导入后不会自动清理异常账号",
+            "明细会保留在当前浏览器会话中",
+          ],
+        );
+        const cleanupPendingSummary = renderResultSummary(
+          "等待第一次清理",
+          "执行自动清理或手动清理后，这里会显示移除、保留和刷新结果。",
+          [
+            state.autoCleanup ? "目录导入时会自动触发清理" : "需要手动触发清理",
+            "明细会保留在当前浏览器会话中",
+          ],
+        );
 
         return `
-          <section class="grid-2">
-            <article class="panel">
-              <div class="section-kicker">目录导入</div>
-              <h3>服务器目录</h3>
-              <div class="helper" style="margin-top:6px;">推荐直接读取导出目录中的 <span class="mono">codex-*.json</span> 文件。</div>
-              <label class="field" style="margin-top:12px;">
-                <span class="field-label">服务器目录</span>
-                <input id="import-path" type="text" value="${escapeHTML(state.importPath)}" placeholder="${escapeHTML(DEFAULT_IMPORT_PATH)}" />
-              </label>
-              <label class="switch-row" style="margin-top:10px;">
-                <input id="auto-cleanup" type="checkbox" ${state.autoCleanup ? "checked" : ""} />
-                导入后自动清除失效账号
-              </label>
-              <div class="button-row" style="margin-top:12px;">
-                <button class="button button-primary" id="import-directory" type="button">导入服务器目录</button>
-                <button class="button button-secondary" data-action="refresh-overview" type="button">同步概览</button>
-              </div>
-            </article>
-
-            <article class="panel">
-              <div class="section-kicker">浏览器上传</div>
-              <h3>批量导入文件</h3>
-              <div class="helper" style="margin-top:6px;">支持多选文件，也支持在兼容浏览器里直接选择整个目录。</div>
-              <div class="file-picker" style="margin-top:12px;">
-                <span class="field-label">选中文件</span>
-                <div class="file-picker-row file-picker-grid">
-                  <input id="upload-files" class="visually-hidden-file" type="file" accept=".json" multiple />
-                  <button class="button button-secondary" data-action="pick-files" type="button">选择文件</button>
-                  <div class="file-picker-summary" id="upload-files-summary">未选择文件</div>
-                </div>
-              </div>
-              <div class="file-picker" style="margin-top:12px;">
-                <span class="field-label">上传整个目录</span>
-                <div class="file-picker-row file-picker-grid">
-                  <input id="upload-directory" class="visually-hidden-file" type="file" accept=".json" webkitdirectory directory multiple />
-                  <button class="button button-secondary" data-action="pick-directory" type="button">选择目录</button>
-                  <div class="file-picker-summary" id="upload-directory-summary">未选择目录</div>
-                </div>
-              </div>
-              <div class="button-row" style="margin-top:12px;">
-                <button class="button button-secondary" id="upload-selected" type="button">上传选中内容</button>
-              </div>
-            </article>
-          </section>
-
-          <section class="table-shell">
-            <div class="table-head">
-              <div>
-                <div class="section-kicker">最近导入</div>
-                <div class="table-title">导入结果</div>
-              </div>
+          <section class="import-workbench">
+            <div class="import-guide">
+              <span class="small-pill">服务器上已有文件时，优先用目录导入</span>
+              <span class="small-pill">临时导入或本地文件，直接用浏览器上传</span>
+              <span class="small-pill">${state.autoCleanup ? "当前会在导入后顺带清理异常账号" : "当前不会自动清理异常账号"}</span>
             </div>
-            ${importResult ? `
-              <section class="grid-4" style="margin-bottom:12px;">
-                ${metricCard("新增账号", formatCount(importResult.imported || 0), "", false)}
-                ${metricCard("跳过文件", formatCount(importResult.skipped || 0), "", false)}
-                ${metricCard("当前账号", formatCount((importResult.accounts || []).length), "", false)}
-                ${metricCard("自动清理", importResult.cleanup ? `移除 ${formatCount(importResult.cleanup.removed || 0)}` : "未执行", "", true)}
-              </section>
-              ${renderOperationTable(importResult.results, "还没有导入结果。")}
-            ` : '<div class="empty-box">还没有导入结果。执行一次目录导入或文件上传后，这里会显示明细。</div>'}
-          </section>
 
-          <section class="table-shell">
-            <div class="table-head">
-              <div>
-                <div class="section-kicker">最近清理</div>
-                <div class="table-title">失效账号清理结果</div>
-              </div>
-            </div>
-            ${cleanupResult ? `
-              <section class="grid-4" style="margin-bottom:12px;">
-                ${metricCard("已移除", formatCount(cleanupResult.removed || 0), "", false)}
-                ${metricCard("已刷新", formatCount(cleanupResult.refreshed || 0), "", false)}
-                ${metricCard("保留账号", formatCount(cleanupResult.kept || 0), "", false)}
-                ${metricCard("当前账号", formatCount((cleanupResult.accounts || state.accounts || []).length), "", false)}
+            <section class="import-grid">
+              <article class="panel import-panel">
+                <div class="import-panel-head">
+                  <div class="section-kicker">目录导入</div>
+                  <h3>从服务器目录导入</h3>
+                  <div class="helper">适合直接读取服务端导出目录中的 <span class="mono">codex-*.json</span> 文件，通常是最快的路径。</div>
+                </div>
+                <div class="import-panel-body">
+                  <label class="field">
+                    <span class="field-label">服务器目录</span>
+                    <input id="import-path" type="text" value="${escapeHTML(state.importPath)}" placeholder="${escapeHTML(DEFAULT_IMPORT_PATH)}" />
+                  </label>
+                  <label class="switch-row">
+                    <input id="auto-cleanup" type="checkbox" ${state.autoCleanup ? "checked" : ""} />
+                    导入后顺带清理异常账号
+                  </label>
+                  <div class="button-row">
+                    <button class="button button-primary" id="import-directory" type="button">导入这个目录</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="panel import-panel">
+                <div class="import-panel-head">
+                  <div class="section-kicker">浏览器上传</div>
+                  <h3>上传文件或整个目录</h3>
+                  <div class="helper">适合从本地机器直接上传，不需要先把文件放到服务器。先选文件，再执行一次上传。</div>
+                </div>
+                <div class="import-panel-body">
+                  <div class="file-picker">
+                    <span class="field-label">选中文件</span>
+                    <div class="file-picker-row file-picker-grid">
+                      <input id="upload-files" class="visually-hidden-file" type="file" accept=".json" multiple />
+                      <button class="button button-secondary" data-action="pick-files" type="button">选择文件</button>
+                      <div class="file-picker-summary" id="upload-files-summary">未选择文件</div>
+                    </div>
+                  </div>
+                  <div class="file-picker">
+                    <span class="field-label">上传整个目录</span>
+                    <div class="file-picker-row file-picker-grid">
+                      <input id="upload-directory" class="visually-hidden-file" type="file" accept=".json" webkitdirectory directory multiple />
+                      <button class="button button-secondary" data-action="pick-directory" type="button">选择目录</button>
+                      <div class="file-picker-summary" id="upload-directory-summary">未选择目录</div>
+                    </div>
+                  </div>
+                  <div class="button-row">
+                    <button class="button button-primary" id="upload-selected" type="button">上传已选择内容</button>
+                  </div>
+                </div>
+              </article>
+            </section>
+
+            <section class="result-stack">
+              <section class="table-shell">
+                <div class="table-head">
+                  <div>
+                    <div class="section-kicker">最近导入</div>
+                    <div class="table-title">导入结果</div>
+                  </div>
+                </div>
+                ${importResult ? `
+                  ${importSummary}
+                  ${renderOperationTable(importResult.results, "这次导入没有返回明细。")}
+                ` : importPendingSummary}
               </section>
-              ${renderOperationTable(cleanupResult.results, "还没有清理结果。")}
-            ` : '<div class="empty-box">还没有清理结果。执行自动清理或手动清理后，这里会显示明细。</div>'}
+
+              <section class="table-shell">
+                <div class="table-head">
+                  <div>
+                    <div class="section-kicker">最近清理</div>
+                    <div class="table-title">异常账号清理结果</div>
+                  </div>
+                </div>
+                ${cleanupResult ? `
+                  ${cleanupSummary}
+                  ${renderOperationTable(cleanupResult.results, "这次清理没有返回明细。")}
+                ` : cleanupPendingSummary}
+              </section>
+            </section>
           </section>
         `;
       }
 
       function renderConfigEditor(mode) {
         const draft = cloneConfigDraft(state.configDraft);
-        const isBootstrap = mode === "bootstrap";
-        const saving = isBootstrap ? state.bootstrapSaving : state.configSaving;
-        const loading = isBootstrap ? false : state.configLoading;
-        const statusText = isBootstrap
-          ? (state.bootstrapSaving ? "正在写入首次配置并切换到正式管理模式。" : (state.bootstrapError || "首次启动已进入初始化模式。完成配置后会生成正式 config.yaml，并切换为管理密钥登录。"))
-          : (state.configLoading ? "正在读取当前配置。" : (state.configStatus || "改动会写入 config.yaml。host、port、TLS 变更需要重启服务后生效。"));
-        const statusLevel = isBootstrap
-          ? (state.bootstrapError ? "bad" : (state.bootstrapSaving ? "warn" : "ok"))
-          : (state.configStatusLevel || (state.configLoading ? "warn" : "ok"));
-        const secretHint = isBootstrap
-          ? "首次配置必须设置管理密钥。保存后会自动进入后台。"
-          : (draft.management.secretConfigured ? "管理密钥已设置。留空表示保持不变；填写新值表示立即替换。" : "当前尚未设置管理密钥。");
+        const saving = state.configSaving;
+        const loading = state.configLoading;
+        const statusText = state.configLoading
+          ? "正在读取当前配置。"
+          : (state.configStatus || "配置会写入 config.yaml。host、port、TLS 变更需要重启后生效。");
+        const statusLevel = state.configStatusLevel || (state.configLoading ? "warn" : "ok");
+        const secretHint = draft.management.secretConfigured
+          ? "管理密钥已设置。留空表示保持不变；填写新值会立即替换。"
+          : "当前还没有管理密钥。建议先设置后再开放远程访问。";
+        const replenishmentOpen = draft.replenishment.enabled || Boolean(draft.replenishment.serviceUrl) || draft.replenishment.serviceTokenConfigured;
 
         return `
-          <section class="config-grid">
-            <article class="config-panel">
-              <div>
-                <div class="section-kicker">${isBootstrap ? "首次配置" : "服务监听"}</div>
-                <h3>${isBootstrap ? "初始化基础参数" : "访问入口"}</h3>
-                <div class="helper" style="margin-top:6px;">${isBootstrap ? "这一步会创建正式配置文件，并将服务切换到正常管理模式。" : "未填写 host 时同时监听 IPv4 / IPv6；监听地址和 TLS 相关字段保存后需要重启。"} </div>
-              </div>
-              <div class="config-form-grid">
-                <label class="field">
-                  <span class="field-label">监听地址</span>
-                  <input data-config-field="host" type="text" value="${escapeHTML(draft.host)}" placeholder="留空表示监听全部接口" />
-                </label>
-                <label class="field">
-                  <span class="field-label">端口</span>
-                  <input data-config-field="port" type="number" min="1" max="65535" value="${escapeHTML(draft.port)}" />
-                </label>
-                <label class="field">
-                  <span class="field-label">账号目录</span>
-                  <input data-config-field="authDir" type="text" value="${escapeHTML(draft.authDir)}" placeholder="./auths" />
-                </label>
-                <label class="field">
-                  <span class="field-label">上游代理</span>
-                  <input data-config-field="proxyUrl" type="text" value="${escapeHTML(draft.proxyUrl)}" placeholder="http://127.0.0.1:7890" />
-                </label>
-              </div>
-            </article>
+          <section class="config-stack">
+            <p class="config-section-note">先维护基础接入项。日志、重试和自动补号都保留，但按需展开，避免把高频操作和低频参数混在一起。</p>
 
-            <article class="config-panel">
-              <div>
-                <div class="section-kicker">${isBootstrap ? "首次配置" : "管理访问"}</div>
-                <h3>管理与 TLS</h3>
-                <div class="helper" style="margin-top:6px;">${escapeHTML(secretHint)}</div>
-              </div>
-              <div class="config-form-grid">
-                <label class="switch-row">
-                  <input data-config-field="management.allowRemote" type="checkbox" ${draft.management.allowRemote ? "checked" : ""} />
-                  <span>允许远程访问管理接口</span>
-                </label>
-                <label class="switch-row">
-                  <input data-config-field="tls.enable" type="checkbox" ${draft.tls.enable ? "checked" : ""} />
-                  <span>启用 TLS / HTTPS</span>
-                </label>
-                <label class="field span-2">
-                  <span class="field-label">管理密钥</span>
-                  <input data-config-field="management.secretKey" type="password" value="${escapeHTML(draft.management.secretKey)}" placeholder="${isBootstrap ? "首次配置必须填写" : "留空表示保持当前密钥"}" autocomplete="new-password" />
-                </label>
-                <label class="field">
-                  <span class="field-label">证书路径</span>
-                  <input data-config-field="tls.cert" type="text" value="${escapeHTML(draft.tls.cert)}" placeholder="/path/to/fullchain.pem" />
-                </label>
-                <label class="field">
-                  <span class="field-label">私钥路径</span>
-                  <input data-config-field="tls.key" type="text" value="${escapeHTML(draft.tls.key)}" placeholder="/path/to/privkey.pem" />
-                </label>
-              </div>
-            </article>
+            <section class="config-grid">
+              <article class="config-panel emphasis">
+                <div>
+                  <div class="section-kicker">基础接入</div>
+                  <h3>服务入口与存储</h3>
+                  <div class="helper" style="margin-top:6px;">这些字段决定服务监听位置、账号文件目录和是否经过上游代理。</div>
+                </div>
+                <div class="config-form-grid">
+                  <label class="field">
+                    <span class="field-label">监听地址</span>
+                    <input data-config-field="host" type="text" value="${escapeHTML(draft.host)}" placeholder="留空表示监听全部接口" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">端口</span>
+                    <input data-config-field="port" type="number" min="1" max="65535" value="${escapeHTML(draft.port)}" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">账号目录</span>
+                    <input data-config-field="authDir" type="text" value="${escapeHTML(draft.authDir)}" placeholder="/data/auths" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">上游代理地址</span>
+                    <input data-config-field="proxyUrl" type="text" value="${escapeHTML(draft.proxyUrl)}" placeholder="http://127.0.0.1:7890" />
+                  </label>
+                </div>
+              </article>
+
+              <article class="config-panel">
+                <div>
+                  <div class="section-kicker">管理访问</div>
+                  <h3>管理密钥与 HTTPS</h3>
+                  <div class="helper" style="margin-top:6px;">${escapeHTML(secretHint)}</div>
+                </div>
+                <div class="config-form-grid">
+                  <label class="switch-row">
+                    <input data-config-field="management.allowRemote" type="checkbox" ${draft.management.allowRemote ? "checked" : ""} />
+                    <span>允许远程访问管理页</span>
+                  </label>
+                  <label class="switch-row">
+                    <input data-config-field="tls.enable" type="checkbox" ${draft.tls.enable ? "checked" : ""} />
+                    <span>启用 HTTPS</span>
+                  </label>
+                  <label class="field span-2">
+                    <span class="field-label">管理密钥</span>
+                    <input data-config-field="management.secretKey" type="password" value="${escapeHTML(draft.management.secretKey)}" placeholder="留空表示保持当前密钥" autocomplete="new-password" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">证书路径</span>
+                    <input data-config-field="tls.cert" type="text" value="${escapeHTML(draft.tls.cert)}" placeholder="/path/to/fullchain.pem" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">私钥路径</span>
+                    <input data-config-field="tls.key" type="text" value="${escapeHTML(draft.tls.key)}" placeholder="/path/to/privkey.pem" />
+                  </label>
+                </div>
+              </article>
+            </section>
 
             <article class="config-panel full">
               <div>
-                <div class="section-kicker">${isBootstrap ? "首次配置" : "代理运行"}</div>
-                <h3>客户端密钥与运行策略</h3>
-                <div class="helper" style="margin-top:6px;">客户端访问 <span class="mono">/v1/*</span> 时使用下列 API Key；每行一个。其余参数仅保留 Codex 代理运行需要的最小集合。</div>
+                <div class="section-kicker">客户端接入</div>
+                <h3>客户端 API Key</h3>
+                <div class="helper" style="margin-top:6px;">这里只放客户端访问 <span class="mono">/v1/*</span> 所需的密钥；每行一个，方便直接批量粘贴。</div>
               </div>
               <div class="config-form-grid">
                 <label class="field span-2">
                   <span class="field-label">客户端 API Key</span>
                   <textarea data-config-field="apiKeysText" placeholder="每行一个 API Key">${escapeHTML(draft.apiKeysText)}</textarea>
                 </label>
-                <label class="switch-row">
-                  <input data-config-field="usageStatisticsEnabled" type="checkbox" ${draft.usageStatisticsEnabled ? "checked" : ""} />
-                  <span>启用用量统计</span>
-                </label>
-                <label class="switch-row">
-                  <input data-config-field="requestLog" type="checkbox" ${draft.requestLog ? "checked" : ""} />
-                  <span>记录 Codex 请求日志</span>
-                </label>
-                <label class="switch-row">
-                  <input data-config-field="loggingToFile" type="checkbox" ${draft.loggingToFile ? "checked" : ""} />
-                  <span>将运行日志写入文件</span>
-                </label>
-                <label class="switch-row">
-                  <input data-config-field="disableCooling" type="checkbox" ${draft.disableCooling ? "checked" : ""} />
-                  <span>关闭额度冷却调度</span>
-                </label>
-                <div class="config-kv field span-2">
-                  <label class="field">
-                    <span class="field-label">日志总大小 MB</span>
-                    <input data-config-field="logsMaxTotalSizeMB" type="number" min="0" value="${escapeHTML(draft.logsMaxTotalSizeMB)}" />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">错误日志保留数</span>
-                    <input data-config-field="errorLogsMaxFiles" type="number" min="0" value="${escapeHTML(draft.errorLogsMaxFiles)}" />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">路由策略</span>
-                    <select data-config-field="routingStrategy">
-                      <option value="round-robin" ${draft.routingStrategy === "round-robin" ? "selected" : ""}>轮询</option>
-                      <option value="fill-first" ${draft.routingStrategy === "fill-first" ? "selected" : ""}>填满优先</option>
-                    </select>
-                  </label>
-                </div>
-                <div class="config-kv field span-2">
-                  <label class="field">
-                    <span class="field-label">请求重试次数</span>
-                    <input data-config-field="requestRetry" type="number" min="0" value="${escapeHTML(draft.requestRetry)}" />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">最大重试账号数</span>
-                    <input data-config-field="maxRetryCredentials" type="number" min="0" value="${escapeHTML(draft.maxRetryCredentials)}" />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">最大重试等待秒数</span>
-                    <input data-config-field="maxRetryInterval" type="number" min="0" value="${escapeHTML(draft.maxRetryInterval)}" />
-                  </label>
-                </div>
-              </div>
-              <div class="config-status ${statusLevel ? statusLevel : ""}">${escapeHTML(statusText)}</div>
-              <div class="button-row">
-                <button class="button button-primary" data-action="${isBootstrap ? "save-bootstrap-config" : "save-config"}" type="button" ${saving || loading ? "disabled" : ""}>
-                  ${isBootstrap ? (saving ? "正在初始化..." : "完成首次配置") : (saving ? "正在保存..." : "保存配置")}
-                </button>
-                ${!isBootstrap ? '<button class="button button-secondary" data-action="reload-config" type="button">重新读取</button>' : ""}
               </div>
             </article>
-            <article class="config-panel full">
-              <div>
-                <div class="section-kicker">自动补号</div>
-                <h3>账号池联动</h3>
-                <div class="helper" style="margin-top:6px;">由 CPA 负责维持目标账号数，并通过内网调用 cdx-rt 补号服务。</div>
+
+            <details class="config-advanced">
+              <summary>展开进阶运行参数</summary>
+              <div class="config-advanced-body">
+                <article class="config-panel full">
+                  <div>
+                    <div class="section-kicker">运行策略</div>
+                    <h3>日志、统计、重试与路由</h3>
+                    <div class="helper" style="margin-top:6px;">这些项属于低频调优。默认值通常已经够用，只有在排障或调整路由策略时再改。</div>
+                  </div>
+                  <div class="config-form-grid">
+                    <label class="switch-row">
+                      <input data-config-field="usageStatisticsEnabled" type="checkbox" ${draft.usageStatisticsEnabled ? "checked" : ""} />
+                      <span>启用用量统计</span>
+                    </label>
+                    <label class="switch-row">
+                      <input data-config-field="requestLog" type="checkbox" ${draft.requestLog ? "checked" : ""} />
+                      <span>记录代理请求日志</span>
+                    </label>
+                    <label class="switch-row">
+                      <input data-config-field="loggingToFile" type="checkbox" ${draft.loggingToFile ? "checked" : ""} />
+                      <span>把运行日志写入文件</span>
+                    </label>
+                    <label class="switch-row">
+                      <input data-config-field="disableCooling" type="checkbox" ${draft.disableCooling ? "checked" : ""} />
+                      <span>关闭额度冷却调度</span>
+                    </label>
+                    <div class="config-kv field span-2">
+                      <label class="field">
+                        <span class="field-label">日志总大小 MB</span>
+                        <input data-config-field="logsMaxTotalSizeMB" type="number" min="0" value="${escapeHTML(draft.logsMaxTotalSizeMB)}" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">错误日志保留数</span>
+                        <input data-config-field="errorLogsMaxFiles" type="number" min="0" value="${escapeHTML(draft.errorLogsMaxFiles)}" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">路由策略</span>
+                        <select data-config-field="routingStrategy">
+                          <option value="round-robin" ${draft.routingStrategy === "round-robin" ? "selected" : ""}>轮询</option>
+                          <option value="fill-first" ${draft.routingStrategy === "fill-first" ? "selected" : ""}>填满优先</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="config-kv field span-2">
+                      <label class="field">
+                        <span class="field-label">请求重试次数</span>
+                        <input data-config-field="requestRetry" type="number" min="0" value="${escapeHTML(draft.requestRetry)}" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">最大重试账号数</span>
+                        <input data-config-field="maxRetryCredentials" type="number" min="0" value="${escapeHTML(draft.maxRetryCredentials)}" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">最大重试等待秒数</span>
+                        <input data-config-field="maxRetryInterval" type="number" min="0" value="${escapeHTML(draft.maxRetryInterval)}" />
+                      </label>
+                    </div>
+                  </div>
+                </article>
               </div>
-              <div class="config-form-grid">
-                <label class="switch-row">
-                  <input data-config-field="replenishment.enabled" type="checkbox" ${draft.replenishment.enabled ? "checked" : ""} />
-                  <span>启用自动补号</span>
-                </label>
-                <label class="switch-row">
-                  <input data-config-field="replenishment.cleanupInvalidAccounts" type="checkbox" ${draft.replenishment.cleanupInvalidAccounts ? "checked" : ""} />
-                  <span>自动清理失效账号</span>
-                </label>
-                <label class="field">
-                  <span class="field-label">目标可用账号数</span>
-                  <input data-config-field="replenishment.targetAccountCount" type="number" min="1" value="${escapeHTML(draft.replenishment.targetAccountCount)}" />
-                </label>
-                <label class="field">
-                  <span class="field-label">补号检查间隔秒数</span>
-                  <input data-config-field="replenishment.checkIntervalSeconds" type="number" min="1" value="${escapeHTML(draft.replenishment.checkIntervalSeconds)}" />
-                </label>
-                <label class="field">
-                  <span class="field-label">额度刷新间隔秒数</span>
-                  <input data-config-field="replenishment.quotaRefreshIntervalSeconds" type="number" min="1" value="${escapeHTML(draft.replenishment.quotaRefreshIntervalSeconds)}" />
-                </label>
-                <label class="field span-2">
-                  <span class="field-label">cdx-rt 服务地址</span>
-                  <input data-config-field="replenishment.serviceUrl" type="text" value="${escapeHTML(draft.replenishment.serviceUrl)}" placeholder="http://cdx-rt:3080" />
-                </label>
-                <label class="field span-2">
-                  <span class="field-label">cdx-rt 服务密钥</span>
-                  <input data-config-field="replenishment.serviceToken" type="password" value="" placeholder="${draft.replenishment.serviceTokenConfigured ? "留空表示保持当前密钥" : "首次配置时填写"}" autocomplete="new-password" />
-                </label>
+            </details>
+
+            <details class="config-advanced" ${replenishmentOpen ? "open" : ""}>
+              <summary>展开自动补号设置</summary>
+              <div class="config-advanced-body">
+                <article class="config-panel full">
+                  <div>
+                    <div class="section-kicker">自动补号</div>
+                    <h3>账号池联动</h3>
+                    <div class="helper" style="margin-top:6px;">由 CPA 负责维持目标账号数，并通过内网调用 cdx-rt。只有需要联动补号时才需要填写这部分。</div>
+                  </div>
+                  <div class="config-form-grid">
+                    <label class="switch-row">
+                      <input data-config-field="replenishment.enabled" type="checkbox" ${draft.replenishment.enabled ? "checked" : ""} />
+                      <span>启用自动补号</span>
+                    </label>
+                    <label class="switch-row">
+                      <input data-config-field="replenishment.cleanupInvalidAccounts" type="checkbox" ${draft.replenishment.cleanupInvalidAccounts ? "checked" : ""} />
+                      <span>补号前自动清理异常账号</span>
+                    </label>
+                    <label class="field">
+                      <span class="field-label">目标可用账号数</span>
+                      <input data-config-field="replenishment.targetAccountCount" type="number" min="1" value="${escapeHTML(draft.replenishment.targetAccountCount)}" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">补号检查间隔（秒）</span>
+                      <input data-config-field="replenishment.checkIntervalSeconds" type="number" min="1" value="${escapeHTML(draft.replenishment.checkIntervalSeconds)}" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">额度巡检间隔（秒）</span>
+                      <input data-config-field="replenishment.quotaRefreshIntervalSeconds" type="number" min="1" value="${escapeHTML(draft.replenishment.quotaRefreshIntervalSeconds)}" />
+                    </label>
+                    <label class="field span-2">
+                      <span class="field-label">cdx-rt 服务地址</span>
+                      <input data-config-field="replenishment.serviceUrl" type="text" value="${escapeHTML(draft.replenishment.serviceUrl)}" placeholder="http://cdx-rt:3080" />
+                    </label>
+                    <label class="field span-2">
+                      <span class="field-label">cdx-rt 服务密钥</span>
+                      <input data-config-field="replenishment.serviceToken" type="password" value="" placeholder="${draft.replenishment.serviceTokenConfigured ? "留空表示保持当前密钥" : "首次配置时填写"}" autocomplete="new-password" />
+                    </label>
+                  </div>
+                </article>
+              </div>
+            </details>
+
+            <article class="config-panel full config-save-panel">
+              <div class="config-status ${statusLevel ? statusLevel : ""}">${escapeHTML(statusText)}</div>
+              <div class="button-row">
+                <button class="button button-primary" data-action="save-config" type="button" ${saving || loading ? "disabled" : ""}>${saving ? "正在保存..." : "保存配置"}</button>
+                <button class="button button-secondary" data-action="reload-config" type="button" ${saving ? "disabled" : ""}>重新读取配置</button>
               </div>
             </article>
           </section>
@@ -3228,7 +3963,7 @@
         const draft = cloneConfigDraft(state.configDraft);
         const statusText = state.bootstrapSaving
           ? "正在写入首次配置并切换到正式管理模式。"
-          : (state.bootstrapError || "首次启动只需要设置管理密钥。其他监听、代理和客户端配置可在进入后台后再补充。");
+          : (state.bootstrapError || "首次启动只需要先设置管理密钥。进入后台后再继续补充监听、代理和客户端配置。");
         const statusLevel = state.bootstrapError ? "bad" : (state.bootstrapSaving ? "warn" : "ok");
 
         return `
@@ -3237,7 +3972,7 @@
               <div>
                 <div class="section-kicker">首次配置</div>
                 <h3>设置管理密钥</h3>
-                <div class="helper" style="margin-top:6px;">保存后会自动生成正式配置，并直接进入后台。其他设置项稍后可在配置页面继续填写。</div>
+                <div class="helper" style="margin-top:6px;">保存后会自动生成正式配置并直接进入后台。其他设置项稍后再补，不影响先完成初始化。</div>
               </div>
               <div class="config-form-grid">
                 <label class="field span-2">
@@ -3266,23 +4001,23 @@
         const cachedQuotaCount = Object.values(state.quotaByAccount).filter((item) => item && item.status === "success").length;
 
         return `
-          <section class="grid-4">
-            ${metricCard("日志条数", formatCount(state.logs.length), "", false)}
-            ${metricCard("账号数量", formatCount(summary.total), "", false)}
-            ${metricCard("缓存额度", formatCount(cachedQuotaCount), "", false)}
-            ${metricCard("累计请求", formatCount(usage.totalRequests), "", false)}
-          </section>
-
           <section class="table-shell">
             <div class="table-head">
               <div>
                 <div class="section-kicker">完整日志</div>
                 <div class="table-title">操作日志</div>
+                <div class="helper" style="margin-top:6px;">这里记录前端触发过的导入、刷新、删除和清理结果，适合快速确认刚才发生了什么。</div>
               </div>
               <div class="button-row">
-                <button class="button button-secondary" data-action="refresh-overview" type="button">刷新概览</button>
+                <button class="button button-secondary" data-action="refresh-overview" type="button">刷新整体状态</button>
                 <button class="button button-secondary" data-action="clear-logs" type="button">清空日志</button>
               </div>
+            </div>
+            <div class="meta-strip" style="margin-bottom:12px;">
+              <span class="small-pill">日志 ${formatCount(state.logs.length)} 条</span>
+              <span class="small-pill">账号 ${formatCount(summary.total)} 个</span>
+              <span class="small-pill">缓存额度 ${formatCount(cachedQuotaCount)} 个</span>
+              <span class="small-pill">累计请求 ${formatCount(usage.totalRequests)} 次</span>
             </div>
             <div id="full-log-list">${renderLogsTable()}</div>
           </section>
@@ -3303,7 +4038,7 @@
             <div class="auth-copy">
               <div class="section-kicker">首次初始化</div>
               <h1 class="auth-title">完成基础配置后进入后台</h1>
-              <p class="auth-description">当前没有可用的正式配置。现在只需要先设置管理密钥，进入后台后再补充其他代理配置。</p>
+              <p class="auth-description">当前还没有正式配置。先设置管理密钥进入后台，其他代理参数稍后再补即可。</p>
             </div>
             ${renderBootstrapEditor()}
           </section>
@@ -3328,7 +4063,7 @@
         elements.authClear.disabled = !state.key;
 
         let statusClass = "auth-status";
-        let statusText = "输入一次管理密钥后会保存在当前浏览器，下次会自动尝试进入后台。";
+        let statusText = "输入管理密钥后会自动进入后台；已保存的密钥下次会自动重试。";
 
         if (!state.bootstrapChecked) {
           statusClass += " warn";
@@ -3344,7 +4079,7 @@
           statusText = state.authError;
         } else if (state.key) {
           statusClass += " warn";
-          statusText = "检测到已保存的管理密钥，验证通过后即可进入后台。";
+          statusText = "检测到已保存的管理密钥，验证通过后会直接进入后台。";
         }
 
         elements.authStatus.className = statusClass;
@@ -3453,6 +4188,14 @@
         }
         if (button.dataset.action === "refresh-overview") {
           loadOverview().catch(() => {});
+          return;
+        }
+        if (button.dataset.action === "refresh-replenishment") {
+          loadReplenishmentStatus().catch(() => {});
+          return;
+        }
+        if (button.dataset.action === "run-replenishment") {
+          runReplenishment();
           return;
         }
         if (button.dataset.action === "refresh-quota-all") {

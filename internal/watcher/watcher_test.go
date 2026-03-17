@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"os"
@@ -124,4 +125,86 @@ func formatHash(sum []byte) string {
 		out[i*2+1] = hex[b&0x0f]
 	}
 	return string(out)
+}
+
+func TestWatcherReloadsConfigAfterRepeatedAtomicReplace(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	authDir := filepath.Join(tempDir, "auths")
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(authDir) error = %v", err)
+	}
+
+	configPath := filepath.Join(tempDir, "config.yaml")
+	initial := config.DefaultBootstrapConfig()
+	initial.AuthDir = authDir
+	initial.Port = 8317
+	if err := config.WriteConfigFile(configPath, initial); err != nil {
+		t.Fatalf("WriteConfigFile(initial) error = %v", err)
+	}
+
+	reloads := make(chan *config.Config, 8)
+	w, err := NewWatcher(configPath, authDir, func(cfg *config.Config) {
+		reloads <- cfg
+	})
+	if err != nil {
+		t.Fatalf("NewWatcher() error = %v", err)
+	}
+	w.SetConfig(initial)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := w.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer func() {
+		_ = w.Stop()
+	}()
+
+	waitForReloadPort(t, reloads, 8317)
+
+	replaceConfigFile(t, configPath, func(cfg *config.Config) {
+		cfg.Port = 8318
+	})
+	waitForReloadPort(t, reloads, 8318)
+
+	replaceConfigFile(t, configPath, func(cfg *config.Config) {
+		cfg.Port = 8319
+	})
+	waitForReloadPort(t, reloads, 8319)
+}
+
+func replaceConfigFile(t *testing.T, configPath string, mutate func(*config.Config)) {
+	t.Helper()
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	mutate(cfg)
+
+	tempPath := configPath + ".tmp"
+	if err = config.WriteConfigFile(tempPath, cfg); err != nil {
+		t.Fatalf("WriteConfigFile(temp) error = %v", err)
+	}
+	if err = os.Rename(tempPath, configPath); err != nil {
+		t.Fatalf("Rename() error = %v", err)
+	}
+}
+
+func waitForReloadPort(t *testing.T, reloads <-chan *config.Config, wantPort int) {
+	t.Helper()
+
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case cfg := <-reloads:
+			if cfg != nil && cfg.Port == wantPort {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for reload with port %d", wantPort)
+		}
+	}
 }

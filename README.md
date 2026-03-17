@@ -33,6 +33,36 @@ Typical use cases:
 
 If you prefer writing config by hand, you can still start from [config.example.yaml](config.example.yaml).
 
+## Docker Data Layout
+
+The packaged image now keeps all mutable user data under `/data`:
+
+```text
+/app
+  CLIProxyAPI
+  config.example.yaml
+
+/data
+  config.yaml
+  auths/
+  import/
+  logs/
+```
+
+Recommended container run command:
+
+```bash
+docker run --rm -p 8317:8317 -v "$PWD/data:/data" codex-proxy:codex-only
+```
+
+Notes:
+
+- the container boots from `/data/config.yaml`
+- imported Codex OAuth files live under `/data/auths`
+- directory import in the web console defaults to `/data/import`
+- runtime logs and request logs are written to `/data/logs`
+- the image runs as uid/gid `1000:1000` so bind-mounted host data stays accessible to a normal user
+
 ## Minimal Config
 
 The shipped [config.example.yaml](config.example.yaml) is already trimmed to the supported surface:

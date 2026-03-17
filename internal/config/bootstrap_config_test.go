@@ -9,7 +9,7 @@ import (
 
 func TestLoadOrCreateConfig_CreatesBootstrapConfigWhenMissing(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
+	configPath := filepath.Join(tmpDir, "data", "config.yaml")
 
 	cfg, created, err := LoadOrCreateConfig(configPath)
 	if err != nil {
@@ -39,10 +39,21 @@ func TestLoadOrCreateConfig_CreatesBootstrapConfigWhenMissing(t *testing.T) {
 	if strings.TrimSpace(cfg.AuthDir) == "" {
 		t.Fatalf("AuthDir is empty")
 	}
+	wantAuthDir := filepath.Join(tmpDir, "data", "auths")
+	if cfg.AuthDir != wantAuthDir {
+		t.Fatalf("AuthDir = %q, want %q", cfg.AuthDir, wantAuthDir)
+	}
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("ReadFile(%s) error = %v", configPath, err)
+	}
+	info, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("Stat(%s) error = %v", configPath, err)
+	}
+	if got := info.Mode().Perm(); got != 0o644 {
+		t.Fatalf("config mode = %04o, want 0644", got)
 	}
 	content := string(data)
 	if !strings.Contains(content, "remote-management:") {

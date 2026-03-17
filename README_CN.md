@@ -26,6 +26,36 @@ Codex 专用代理与管理控制台。
 4. 第一次进入时在网页里完成初始化，至少配置一个下游 `api-keys`。
 5. 初始化完成后用管理密钥登录后台。
 
+## Docker 数据目录
+
+打包后的镜像把所有用户态数据统一放到 `/data`：
+
+```text
+/app
+  CLIProxyAPI
+  config.example.yaml
+
+/data
+  config.yaml
+  auths/
+  import/
+  logs/
+```
+
+推荐启动方式：
+
+```bash
+docker run --rm -p 8317:8317 -v "$PWD/data:/data" codex-proxy:codex-only
+```
+
+说明：
+
+- 容器默认从 `/data/config.yaml` 启动
+- Codex 账号文件存放在 `/data/auths`
+- 管理台“服务器目录导入”默认使用 `/data/import`
+- 运行日志和请求日志统一写入 `/data/logs`
+- 镜像默认以 `1000:1000` 运行，绑定到宿主机目录时更容易保持普通用户可直接访问
+
 ## 当前支持的配置
 
 示例配置 [config.example.yaml](config.example.yaml) 已经裁剪到最小可用集合：

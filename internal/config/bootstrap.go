@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/fileperm"
 )
 
 // LoadOrCreateConfig loads the configuration file when it exists.
@@ -102,12 +104,18 @@ func WriteConfigFile(configFile string, cfg *Config) error {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("create config directory: %w", err)
 		}
+		if err := fileperm.BestEffortChmod(dir, 0o755); err != nil {
+			return fmt.Errorf("set config directory permissions: %w", err)
+		}
 	}
 
 	data := []byte(renderBootstrapConfigYAML(cfg))
 	data = NormalizeCommentIndentation(data)
-	if err := os.WriteFile(configFile, data, 0o600); err != nil {
+	if err := os.WriteFile(configFile, data, 0o644); err != nil {
 		return fmt.Errorf("write config file: %w", err)
+	}
+	if err := fileperm.BestEffortChmod(configFile, 0o644); err != nil {
+		return fmt.Errorf("set config file permissions: %w", err)
 	}
 	return nil
 }

@@ -50,6 +50,8 @@ type Handler struct {
 	envSecret           string
 	logDir              string
 	postAuthHook        coreauth.PostAuthHook
+	replenishmentStatus func(context.Context) (ReplenishmentStatus, error)
+	replenishmentRun    func(context.Context) (ReplenishmentStatus, error)
 }
 
 // NewHandler creates a new management handler instance.
@@ -139,6 +141,15 @@ func (h *Handler) SetPostAuthHook(hook coreauth.PostAuthHook) {
 // SetCodexRefresher overrides the default Codex refresh behavior, primarily for tests.
 func (h *Handler) SetCodexRefresher(fn func(context.Context, *coreauth.Auth) (*coreauth.Auth, error)) {
 	h.codexRefresher = fn
+}
+
+// SetReplenishmentCallbacks wires server-owned replenishment status and manual run actions.
+func (h *Handler) SetReplenishmentCallbacks(
+	statusFn func(context.Context) (ReplenishmentStatus, error),
+	runFn func(context.Context) (ReplenishmentStatus, error),
+) {
+	h.replenishmentStatus = statusFn
+	h.replenishmentRun = runFn
 }
 
 // Middleware enforces access control for management endpoints.
