@@ -66,3 +66,42 @@ func TestRegisterModelsForAuth_IgnoresNonCodexProvider(t *testing.T) {
 		t.Fatalf("expected no models to be registered for non-codex auth, got %d", len(models))
 	}
 }
+
+func TestRegisterModelsForAuth_FreePlanIncludesLatestCodexModels(t *testing.T) {
+	service := &Service{cfg: &config.Config{}}
+	auth := &coreauth.Auth{
+		ID:       "auth-free",
+		Provider: "codex",
+		Status:   coreauth.StatusActive,
+		Attributes: map[string]string{
+			"plan_type": "free",
+		},
+	}
+
+	modelRegistry := GlobalModelRegistry()
+	modelRegistry.UnregisterClient(auth.ID)
+	t.Cleanup(func() {
+		modelRegistry.UnregisterClient(auth.ID)
+	})
+
+	service.registerModelsForAuth(auth)
+
+	models := modelRegistry.GetModelsForClient(auth.ID)
+	if len(models) == 0 {
+		t.Fatal("expected free plan models to be registered")
+	}
+
+	seen := make(map[string]struct{}, len(models))
+	for _, model := range models {
+		if model == nil {
+			continue
+		}
+		seen[strings.TrimSpace(model.ID)] = struct{}{}
+	}
+
+	for _, want := range []string{"gpt-5.3-codex", "gpt-5.4"} {
+		if _, ok := seen[want]; !ok {
+			t.Fatalf("registered free plan models missing %q", want)
+		}
+	}
+}
