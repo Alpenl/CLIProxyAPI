@@ -13,6 +13,7 @@ type fakeControlClient struct {
 	created []CreateJobInput
 	job     *Job
 	archive []byte
+	downloads int
 	err     error
 	getJob  func(context.Context, string, *fakeControlClient) (*Job, error)
 }
@@ -44,6 +45,7 @@ func (c *fakeControlClient) GetJob(ctx context.Context, id string) (*Job, error)
 
 func (c *fakeControlClient) DownloadArchive(_ context.Context, id string) ([]byte, error) {
 	if c.job != nil && c.job.ID == id {
+		c.downloads++
 		return c.archive, nil
 	}
 	return nil, nil
@@ -257,5 +259,113 @@ func TestAutoManagerRunManual_ImportsArchiveSoonAfterJobCompletes(t *testing.T) 
 	}
 	if pending := manager.CurrentJob(); pending != nil {
 		t.Fatalf("pending job = %#v, want nil", pending)
+	}
+}
+
+func TestAutoManagerRunOnce_SkipsArchiveDownloadWhenStreamedCallbackAlreadyDeliveredAllSuccesses(t *testing.T) {
+	client := &fakeControlClient{}
+	imported := 0
+	manager := NewAutoManager(AutoManagerOptions{
+		GetConfig: func() ConfigSnapshot {
+			return ConfigSnapshot{
+				Enabled:            true,
+				TargetAccountCount: 2,
+			}
+		},
+		ListAuths: func() []*coreauth.Auth { return nil },
+		Client:    client,
+		ImportArchive: func(_ context.Context, data []byte) error {
+			imported++
+			_ = data
+			return nil
+		},
+		BuildCreateJobInput: func(requestedSuccesses int) CreateJobInput {
+			return CreateJobInput{
+				RequestedSuccesses: requestedSuccesses,
+				Source:             "auto",
+				ZipRequired:        true,
+				Callback: &CallbackConfig{
+					URL:   "http://127.0.0.1:8317/v0/internal/replenishment/accounts",
+					Token: "callback-secret",
+				},
+			}
+		},
+	})
+
+	if err := manager.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce(create) error = %v", err)
+	}
+
+	manager.NoteStreamedAccount("job-1", "codex-first.json")
+	manager.NoteStreamedAccount("job-1", "codex-second.json")
+
+	client.job.Status = "completed"
+	client.job.SuccessCount = 2
+	client.archive = []byte("archive-bytes")
+
+	if err := manager.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce(reconcile) error = %v", err)
+	}
+	if client.downloads != 0 {
+		t.Fatalf("archive downloads = %d, want 0", client.downloads)
+	}
+	if imported != 0 {
+		t.Fatalf("imported archives = %d, want 0", imported)
+	}
+	if pending := manager.CurrentJob(); pending != nil {
+		t.Fatalf("pending job = %#v, want nil", pending)
+	}
+}
+
+func TestAutoManagerRunOnce_DownloadsArchiveWhenStreamedCallbackDeliveredOnlySubset(t *testing.T) {
+	client := &fakeControlClient{}
+	imported := 0
+	manager := NewAutoManager(AutoManagerOptions{
+		GetConfig: func() ConfigSnapshot {
+			return ConfigSnapshot{
+				Enabled:            true,
+				TargetAccountCount: 2,
+			}
+		},
+		ListAuths: func() []*coreauth.Auth { return nil },
+		Client:    client,
+		ImportArchive: func(_ context.Context, data []byte) error {
+			if string(data) != "archive-bytes" {
+				t.Fatalf("unexpected archive payload: %q", string(data))
+			}
+			imported++
+			return nil
+		},
+		BuildCreateJobInput: func(requestedSuccesses int) CreateJobInput {
+			return CreateJobInput{
+				RequestedSuccesses: requestedSuccesses,
+				Source:             "auto",
+				ZipRequired:        true,
+				Callback: &CallbackConfig{
+					URL:   "http://127.0.0.1:8317/v0/internal/replenishment/accounts",
+					Token: "callback-secret",
+				},
+			}
+		},
+	})
+
+	if err := manager.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce(create) error = %v", err)
+	}
+
+	manager.NoteStreamedAccount("job-1", "codex-first.json")
+
+	client.job.Status = "completed"
+	client.job.SuccessCount = 2
+	client.archive = []byte("archive-bytes")
+
+	if err := manager.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce(reconcile) error = %v", err)
+	}
+	if client.downloads != 1 {
+		t.Fatalf("archive downloads = %d, want 1", client.downloads)
+	}
+	if imported != 1 {
+		t.Fatalf("imported archives = %d, want 1", imported)
 	}
 }

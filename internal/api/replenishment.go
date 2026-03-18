@@ -489,6 +489,9 @@ func (s *Server) handleReplenishmentAccountCallback(c *gin.Context) {
 	result, err := s.mgmt.ImportCodexAccountBytes(c.Request.Context(), fileName, req.Account)
 	if err != nil {
 		if strings.EqualFold(result.Status, "skipped") {
+			if manager := s.currentReplenishmentManager(); manager != nil {
+				manager.NoteStreamedAccount(req.JobID, fileName)
+			}
 			c.JSON(http.StatusOK, gin.H{"result": result})
 			return
 		}
@@ -496,6 +499,9 @@ func (s *Server) handleReplenishmentAccountCallback(c *gin.Context) {
 		return
 	}
 
+	if manager := s.currentReplenishmentManager(); manager != nil {
+		manager.NoteStreamedAccount(req.JobID, fileName)
+	}
 	c.JSON(http.StatusOK, gin.H{"result": result})
 }
 

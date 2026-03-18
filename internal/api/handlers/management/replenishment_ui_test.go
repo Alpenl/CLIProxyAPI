@@ -175,6 +175,63 @@ func TestGetOverview_ReturnsAggregatedManagementPayload(t *testing.T) {
 	}
 }
 
+func TestBuildOverviewPayloadUsesShortTTLCache(t *testing.T) {
+	handler, _, _ := newCodexManagementTestHandler(t)
+
+	now := time.Unix(1_700_000_000, 0).UTC()
+	handler.now = func() time.Time { return now }
+
+	statusCalls := 0
+	handler.SetReplenishmentCallbacks(
+		func(_ context.Context) (ReplenishmentStatus, error) {
+			statusCalls++
+			return ReplenishmentStatus{
+				Configured: true,
+				Deficit:    statusCalls,
+			}, nil
+		},
+		nil,
+	)
+
+	first := handler.buildOverviewPayload(context.Background())
+	second := handler.buildOverviewPayload(context.Background())
+
+	if statusCalls != 1 {
+		t.Fatalf("status callback calls after warm cache = %d, want 1", statusCalls)
+	}
+
+	firstStatus, ok := first["replenishment"].(ReplenishmentStatus)
+	if !ok {
+		t.Fatalf("expected replenishment status in first payload, got %#v", first["replenishment"])
+	}
+	if firstStatus.Deficit != 1 {
+		t.Fatalf("first deficit = %d, want 1", firstStatus.Deficit)
+	}
+
+	secondStatus, ok := second["replenishment"].(ReplenishmentStatus)
+	if !ok {
+		t.Fatalf("expected replenishment status in second payload, got %#v", second["replenishment"])
+	}
+	if secondStatus.Deficit != 1 {
+		t.Fatalf("second deficit = %d, want cached 1", secondStatus.Deficit)
+	}
+
+	now = now.Add(overviewCacheTTL + time.Millisecond)
+	third := handler.buildOverviewPayload(context.Background())
+
+	if statusCalls != 2 {
+		t.Fatalf("status callback calls after ttl expiry = %d, want 2", statusCalls)
+	}
+
+	thirdStatus, ok := third["replenishment"].(ReplenishmentStatus)
+	if !ok {
+		t.Fatalf("expected replenishment status in third payload, got %#v", third["replenishment"])
+	}
+	if thirdStatus.Deficit != 2 {
+		t.Fatalf("third deficit = %d, want refreshed 2", thirdStatus.Deficit)
+	}
+}
+
 func TestManagementUIHTML_ContainsReplenishmentControls(t *testing.T) {
 	html, err := managementui.HTML()
 	if err != nil {

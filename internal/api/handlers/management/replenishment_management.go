@@ -11,17 +11,17 @@ import (
 )
 
 type ReplenishmentStatus struct {
-	Configured         bool                    `json:"configured"`
-	ServiceReady       bool                    `json:"serviceReady"`
-	Enabled            bool                    `json:"enabled"`
-	ServiceURL         string                  `json:"serviceUrl,omitempty"`
-	TargetAccountCount int                     `json:"targetAccountCount"`
-	CheckInterval      int                     `json:"checkIntervalSeconds"`
+	Configured         bool                       `json:"configured"`
+	ServiceReady       bool                       `json:"serviceReady"`
+	Enabled            bool                       `json:"enabled"`
+	ServiceURL         string                     `json:"serviceUrl,omitempty"`
+	TargetAccountCount int                        `json:"targetAccountCount"`
+	CheckInterval      int                        `json:"checkIntervalSeconds"`
 	Pool               replenishment.PoolSnapshot `json:"pool"`
-	Deficit            int                     `json:"deficit"`
-	CurrentJob         *replenishment.Job      `json:"currentJob,omitempty"`
-	FailureCount       int                     `json:"failureCount"`
-	NextAttemptAt      *time.Time              `json:"nextAttemptAt,omitempty"`
+	Deficit            int                        `json:"deficit"`
+	CurrentJob         *replenishment.Job         `json:"currentJob,omitempty"`
+	FailureCount       int                        `json:"failureCount"`
+	NextAttemptAt      *time.Time                 `json:"nextAttemptAt,omitempty"`
 }
 
 func (h *Handler) GetReplenishmentStatus(c *gin.Context) {
@@ -40,6 +40,7 @@ func (h *Handler) RunReplenishment(c *gin.Context) {
 	}
 
 	status, err := h.replenishmentRun(c.Request.Context())
+	h.invalidateOverviewCache()
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error":         err.Error(),
@@ -49,7 +50,7 @@ func (h *Handler) RunReplenishment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":         "ok",
+		"status":        "ok",
 		"replenishment": status,
 	})
 }

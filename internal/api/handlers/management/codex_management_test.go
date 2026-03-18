@@ -327,6 +327,45 @@ func TestCodexManagementCleanupInvalid_RemovesBrokenAccounts(t *testing.T) {
 	}
 }
 
+func TestCodexManagementCleanupInvalid_KeepsAccountsOnTransientRefreshFailure(t *testing.T) {
+	handler, manager, authDir := newCodexManagementTestHandler(t)
+
+	transientPath := writeAuthJSONFile(t, authDir, "codex-transient.json", `{"type":"codex","email":"transient@example.com","refresh_token":"refresh-transient","access_token":"access-transient"}`)
+	registerAuthFile(t, handler, transientPath)
+
+	handler.codexRefresher = func(_ context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
+		return nil, errors.New("context deadline exceeded")
+	}
+
+	router := newCodexManagementRouter(handler)
+	req := httptest.NewRequest(http.MethodPost, "/v0/management/codex/cleanup-invalid", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	payload := decodeJSONBody(t, rr)
+	if got := int(payload["removed"].(float64)); got != 0 {
+		t.Fatalf("expected 0 removed accounts, got %d", got)
+	}
+	if got := int(payload["kept"].(float64)); got != 1 {
+		t.Fatalf("expected 1 kept account, got %d", got)
+	}
+
+	if _, err := os.Stat(transientPath); err != nil {
+		t.Fatalf("expected transient auth file to remain, stat err: %v", err)
+	}
+
+	auths := manager.List()
+	if len(auths) != 1 {
+		t.Fatalf("expected 1 remaining auth after cleanup, got %d", len(auths))
+	}
+}
+
 func TestCodexManagementDeleteAccount_RemovesAuthFile(t *testing.T) {
 	handler, manager, authDir := newCodexManagementTestHandler(t)
 

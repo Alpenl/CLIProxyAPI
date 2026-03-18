@@ -117,6 +117,13 @@ func extractCodexIDTokenClaims(auth *coreauth.Auth) gin.H {
 			result["plan_type"] = v
 		}
 	}
+	if len(result) == 0 && auth.Metadata != nil {
+		if v, ok := auth.Metadata["account_id"].(string); ok {
+			if trimmed := strings.TrimSpace(v); trimmed != "" {
+				result["chatgpt_account_id"] = trimmed
+			}
+		}
+	}
 	if len(result) > 0 {
 		return result
 	}
@@ -296,6 +303,9 @@ func populateAuthDerivedAttributes(authType string, metadata map[string]any, att
 	}
 	if !strings.EqualFold(strings.TrimSpace(authType), "codex") {
 		return
+	}
+	if v := stringMetadata(metadata, "account_id"); v != "" {
+		attr["chatgpt_account_id"] = v
 	}
 	idTokenRaw, _ := metadata["id_token"].(string)
 	idToken := strings.TrimSpace(idTokenRaw)

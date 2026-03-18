@@ -512,6 +512,13 @@ func (h *Handler) cleanupCodexAccounts(ctx context.Context, names map[string]str
 
 		refreshed, err := h.refreshCodexAuth(ctx, auth)
 		if err != nil {
+			if !shouldRemoveCodexAuthOnRefreshError(err) {
+				result.Status = "kept"
+				result.Reason = fmt.Sprintf("transient refresh failure: %v", err)
+				summary.Kept++
+				summary.Results = append(summary.Results, result)
+				continue
+			}
 			result.Status = "removed"
 			result.Reason = err.Error()
 			if errRemove := h.removeCodexAuth(ctx, auth, path); errRemove != nil {
@@ -630,6 +637,44 @@ func (h *Handler) removeCodexAuth(ctx context.Context, auth *coreauth.Auth, path
 		h.removeAuthRuntime(h.authIDForPath(path))
 	}
 	return nil
+}
+
+func shouldRemoveCodexAuthOnRefreshError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if withStatus, ok := err.(interface{ StatusCode() int }); ok {
+		switch withStatus.StatusCode() {
+		case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+			return true
+		}
+	}
+
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	if message == "" {
+		return false
+	}
+
+	permanentPatterns := []string{
+		"invalid_grant",
+		"invalid_refresh_token",
+		"invalid refresh token",
+		"refresh token revoked",
+		"refresh token expired",
+		"could not parse your authentication token",
+		"please try signing in again",
+		"signing in again",
+		"login required",
+		"login_required",
+		"auth_not_found",
+		"unauthorized",
+	}
+	for _, pattern := range permanentPatterns {
+		if strings.Contains(message, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) removeAuthRuntime(id string) {

@@ -3,6 +3,7 @@ package replenishment
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +47,9 @@ type AutoManager struct {
 	nextAttemptAt time.Time
 	watchCancel   context.CancelFunc
 	reconcileMu   sync.Mutex
+
+	pendingCallbackExpected bool
+	pendingStreamedFiles    map[string]struct{}
 }
 
 var pendingReconcilePollInterval = 2 * time.Second
@@ -146,13 +150,15 @@ func (m *AutoManager) run(ctx context.Context, force bool) error {
 		return nil
 	}
 
-	job, err := m.client.CreateJob(ctx, m.buildJobInput(deficit))
+	input := m.buildJobInput(deficit)
+	job, err := m.client.CreateJob(ctx, input)
 	if err != nil {
 		m.recordFailure()
 		return err
 	}
 
 	m.setPending(job)
+	m.setPendingCallbackExpected(input.Callback != nil)
 	m.resetFailure()
 	return nil
 }
@@ -183,6 +189,10 @@ func (m *AutoManager) reconcilePending(ctx context.Context, pending *Job) error 
 
 	switch strings.ToLower(strings.TrimSpace(job.Status)) {
 	case "completed", "partial":
+		if m.shouldSkipArchiveDownload(job) {
+			m.clearPending()
+			return nil
+		}
 		archive, err := m.client.DownloadArchive(ctx, job.ID)
 		if err != nil {
 			return err
@@ -264,9 +274,67 @@ func (m *AutoManager) setPending(job *Job) {
 		return
 	}
 	m.mu.Lock()
+	sameJob := m.pending != nil && job != nil && m.pending.ID == job.ID
 	m.pending = cloneJob(job)
+	if !sameJob {
+		m.pendingCallbackExpected = false
+		m.pendingStreamedFiles = make(map[string]struct{})
+	}
 	m.mu.Unlock()
 	m.ensurePendingWatcher()
+}
+
+func (m *AutoManager) setPendingCallbackExpected(enabled bool) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	m.pendingCallbackExpected = enabled
+	if m.pendingStreamedFiles == nil {
+		m.pendingStreamedFiles = make(map[string]struct{})
+	}
+	m.mu.Unlock()
+}
+
+func (m *AutoManager) NoteStreamedAccount(jobID, fileName string) {
+	if m == nil {
+		return
+	}
+
+	jobID = strings.TrimSpace(jobID)
+	if jobID == "" {
+		return
+	}
+
+	normalizedFileName := strings.TrimSpace(filepath.Base(fileName))
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.pending == nil || m.pending.ID != jobID || !m.pendingCallbackExpected {
+		return
+	}
+	if m.pendingStreamedFiles == nil {
+		m.pendingStreamedFiles = make(map[string]struct{})
+	}
+	if normalizedFileName == "" {
+		normalizedFileName = fmt.Sprintf("streamed-%d", len(m.pendingStreamedFiles)+1)
+	}
+	m.pendingStreamedFiles[normalizedFileName] = struct{}{}
+}
+
+func (m *AutoManager) shouldSkipArchiveDownload(job *Job) bool {
+	if m == nil || job == nil {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.pending == nil || m.pending.ID != job.ID || !m.pendingCallbackExpected {
+		return false
+	}
+	if job.SuccessCount <= 0 {
+		return true
+	}
+	return len(m.pendingStreamedFiles) >= job.SuccessCount
 }
 
 func (m *AutoManager) clearPending() {
@@ -275,6 +343,8 @@ func (m *AutoManager) clearPending() {
 	}
 	m.mu.Lock()
 	m.pending = nil
+	m.pendingCallbackExpected = false
+	m.pendingStreamedFiles = nil
 	cancel := m.watchCancel
 	m.watchCancel = nil
 	m.mu.Unlock()

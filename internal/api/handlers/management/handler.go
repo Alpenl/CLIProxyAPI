@@ -55,12 +55,20 @@ type Handler struct {
 	replenishmentRun    func(context.Context) (ReplenishmentStatus, error)
 	now                 func() time.Time
 	codexAccountsCache  codexAccountsCacheEntry
+	overviewCache       overviewCacheEntry
 }
 
 const codexAccountsCacheTTL = time.Second
+const overviewCacheTTL = time.Second
 
 type codexAccountsCacheEntry struct {
 	entries   []gin.H
+	expiresAt time.Time
+	ready     bool
+}
+
+type overviewCacheEntry struct {
+	payload   gin.H
 	expiresAt time.Time
 	ready     bool
 }
@@ -133,7 +141,10 @@ func (h *Handler) SetAuthManager(manager *coreauth.Manager) {
 }
 
 // SetUsageStatistics allows replacing the usage statistics reference.
-func (h *Handler) SetUsageStatistics(stats *usage.RequestStatistics) { h.usageStats = stats }
+func (h *Handler) SetUsageStatistics(stats *usage.RequestStatistics) {
+	h.usageStats = stats
+	h.invalidateOverviewCache()
+}
 
 // SetLocalPassword configures the runtime-local password accepted for localhost requests.
 func (h *Handler) SetLocalPassword(password string) { h.localPassword = password }
@@ -168,6 +179,7 @@ func (h *Handler) SetReplenishmentCallbacks(
 ) {
 	h.replenishmentStatus = statusFn
 	h.replenishmentRun = runFn
+	h.invalidateOverviewCache()
 }
 
 func (h *Handler) invalidateCodexAccountsCache() {
@@ -176,6 +188,16 @@ func (h *Handler) invalidateCodexAccountsCache() {
 	}
 	h.cacheMu.Lock()
 	h.codexAccountsCache = codexAccountsCacheEntry{}
+	h.overviewCache = overviewCacheEntry{}
+	h.cacheMu.Unlock()
+}
+
+func (h *Handler) invalidateOverviewCache() {
+	if h == nil {
+		return
+	}
+	h.cacheMu.Lock()
+	h.overviewCache = overviewCacheEntry{}
 	h.cacheMu.Unlock()
 }
 
@@ -203,6 +225,35 @@ func (h *Handler) storeCodexAccountsCache(entries []gin.H) {
 	h.codexAccountsCache = codexAccountsCacheEntry{
 		entries:   cloneCodexAccountsEntries(entries),
 		expiresAt: h.now().Add(codexAccountsCacheTTL),
+		ready:     true,
+	}
+	h.cacheMu.Unlock()
+}
+
+func (h *Handler) loadOverviewCache() (gin.H, bool) {
+	if h == nil || h.now == nil {
+		return nil, false
+	}
+	h.cacheMu.Lock()
+	defer h.cacheMu.Unlock()
+	if !h.overviewCache.ready || h.overviewCache.expiresAt.IsZero() {
+		return nil, false
+	}
+	if !h.now().Before(h.overviewCache.expiresAt) {
+		h.overviewCache = overviewCacheEntry{}
+		return nil, false
+	}
+	return cloneGinMap(h.overviewCache.payload), true
+}
+
+func (h *Handler) storeOverviewCache(payload gin.H) {
+	if h == nil || h.now == nil {
+		return
+	}
+	h.cacheMu.Lock()
+	h.overviewCache = overviewCacheEntry{
+		payload:   cloneGinMap(payload),
+		expiresAt: h.now().Add(overviewCacheTTL),
 		ready:     true,
 	}
 	h.cacheMu.Unlock()
@@ -248,6 +299,14 @@ func cloneJSONLikeValue(value any) any {
 		dst := make([]any, len(typed))
 		for i, nested := range typed {
 			dst[i] = cloneJSONLikeValue(nested)
+		}
+		return dst
+	case []gin.H:
+		return cloneCodexAccountsEntries(typed)
+	case []map[string]any:
+		dst := make([]map[string]any, len(typed))
+		for i, nested := range typed {
+			dst[i] = cloneGinMap(gin.H(nested))
 		}
 		return dst
 	default:

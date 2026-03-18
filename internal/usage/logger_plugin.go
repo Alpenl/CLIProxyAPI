@@ -17,6 +17,8 @@ import (
 
 var statisticsEnabled atomic.Bool
 
+const requestDetailsLimitPerModel = 256
+
 func init() {
 	statisticsEnabled.Store(true)
 	coreusage.RegisterPlugin(NewLoggerPlugin())
@@ -131,7 +133,7 @@ type APISnapshot struct {
 type ModelSnapshot struct {
 	TotalRequests int64           `json:"total_requests"`
 	TotalTokens   int64           `json:"total_tokens"`
-	Details       []RequestDetail `json:"details"`
+	Details       []RequestDetail `json:"details,omitempty"`
 }
 
 var defaultRequestStatistics = NewRequestStatistics()
@@ -220,11 +222,25 @@ func (s *RequestStatistics) updateAPIStats(stats *apiStats, model string, detail
 	}
 	modelStatsValue.TotalRequests++
 	modelStatsValue.TotalTokens += detail.Tokens.TotalTokens
+	if len(modelStatsValue.Details) >= requestDetailsLimitPerModel {
+		copy(modelStatsValue.Details, modelStatsValue.Details[1:])
+		modelStatsValue.Details[len(modelStatsValue.Details)-1] = detail
+		return
+	}
 	modelStatsValue.Details = append(modelStatsValue.Details, detail)
 }
 
 // Snapshot returns a copy of the aggregated metrics for external consumption.
 func (s *RequestStatistics) Snapshot() StatisticsSnapshot {
+	return s.snapshot(true)
+}
+
+// SummarySnapshot returns a lightweight copy of the aggregated metrics without per-request details.
+func (s *RequestStatistics) SummarySnapshot() StatisticsSnapshot {
+	return s.snapshot(false)
+}
+
+func (s *RequestStatistics) snapshot(includeDetails bool) StatisticsSnapshot {
 	result := StatisticsSnapshot{}
 	if s == nil {
 		return result
@@ -246,13 +262,16 @@ func (s *RequestStatistics) Snapshot() StatisticsSnapshot {
 			Models:        make(map[string]ModelSnapshot, len(stats.Models)),
 		}
 		for modelName, modelStatsValue := range stats.Models {
-			requestDetails := make([]RequestDetail, len(modelStatsValue.Details))
-			copy(requestDetails, modelStatsValue.Details)
-			apiSnapshot.Models[modelName] = ModelSnapshot{
+			modelSnapshot := ModelSnapshot{
 				TotalRequests: modelStatsValue.TotalRequests,
 				TotalTokens:   modelStatsValue.TotalTokens,
-				Details:       requestDetails,
 			}
+			if includeDetails {
+				requestDetails := make([]RequestDetail, len(modelStatsValue.Details))
+				copy(requestDetails, modelStatsValue.Details)
+				modelSnapshot.Details = requestDetails
+			}
+			apiSnapshot.Models[modelName] = modelSnapshot
 		}
 		result.APIs[apiName] = apiSnapshot
 	}

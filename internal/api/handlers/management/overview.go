@@ -13,6 +13,10 @@ func (h *Handler) GetOverview(c *gin.Context) {
 }
 
 func (h *Handler) buildOverviewPayload(ctx context.Context) gin.H {
+	if cached, ok := h.loadOverviewCache(); ok {
+		return cached
+	}
+
 	payload := gin.H{
 		"accounts":        h.listCodexAccountEntries(),
 		"usage":           usage.StatisticsSnapshot{},
@@ -21,7 +25,7 @@ func (h *Handler) buildOverviewPayload(ctx context.Context) gin.H {
 	}
 
 	if h != nil && h.usageStats != nil {
-		snapshot := h.usageStats.Snapshot()
+		snapshot := h.usageStats.SummarySnapshot()
 		payload["usage"] = snapshot
 		payload["failed_requests"] = snapshot.FailureCount
 	}
@@ -32,5 +36,6 @@ func (h *Handler) buildOverviewPayload(ctx context.Context) gin.H {
 		payload["replenishment_error"] = err.Error()
 	}
 
+	h.storeOverviewCache(payload)
 	return payload
 }

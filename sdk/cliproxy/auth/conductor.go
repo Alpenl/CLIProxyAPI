@@ -290,9 +290,80 @@ func readStreamBootstrap(ctx context.Context, ch <-chan cliproxyexecutor.StreamC
 			return nil, false, chunk.Err
 		}
 		buffered = append(buffered, chunk)
-		if len(chunk.Payload) > 0 {
+		if streamChunkCommitsResponse(chunk) {
 			return buffered, false, nil
 		}
+	}
+}
+
+func streamChunkCommitsResponse(chunk cliproxyexecutor.StreamChunk) bool {
+	payload := bytes.TrimSpace(chunk.Payload)
+	if len(payload) == 0 {
+		return false
+	}
+
+	lines := bytes.Split(payload, []byte("\n"))
+	sawBootstrap := false
+	for _, rawLine := range lines {
+		line := bytes.TrimSpace(rawLine)
+		if len(line) == 0 {
+			continue
+		}
+
+		switch {
+		case bytes.HasPrefix(line, []byte(":")),
+			bytes.HasPrefix(line, []byte("event:")),
+			bytes.HasPrefix(line, []byte("id:")),
+			bytes.HasPrefix(line, []byte("retry:")):
+			sawBootstrap = true
+			continue
+		case bytes.HasPrefix(line, []byte("data:")):
+			data := bytes.TrimSpace(line[5:])
+			if len(data) == 0 || bytes.Equal(data, []byte("[DONE]")) {
+				sawBootstrap = true
+				continue
+			}
+			if eventType := sseJSONEventType(data); isBootstrapOnlySSEEventType(eventType) {
+				sawBootstrap = true
+				continue
+			}
+			return true
+		default:
+			return true
+		}
+	}
+
+	return !sawBootstrap
+}
+
+func sseJSONEventType(data []byte) string {
+	if len(data) == 0 || !json.Valid(data) {
+		return ""
+	}
+	var payload struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(payload.Type)
+}
+
+func isBootstrapOnlySSEEventType(eventType string) bool {
+	switch strings.TrimSpace(eventType) {
+	case "",
+		"response.created",
+		"response.in_progress",
+		"response.queued",
+		"response.output_item.added",
+		"response.content_part.added",
+		"response.output_text.added",
+		"response.refusal.added",
+		"response.reasoning_summary_part.added",
+		"response.reasoning_summary_text.added":
+		return true
+	default:
+		return false
 	}
 }
 

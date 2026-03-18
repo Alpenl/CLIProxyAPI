@@ -170,7 +170,11 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, re
 		}
 
 		line = bytes.TrimSpace(line[5:])
-		if gjson.GetBytes(line, "type").String() != "response.completed" {
+		if streamErr, ok := parseCodexStreamTerminalError(line); ok {
+			err = streamErr
+			return resp, err
+		}
+		if !isCodexCompletionEventType(gjson.GetBytes(line, "type").String()) {
 			continue
 		}
 
@@ -369,7 +373,13 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 
 			if bytes.HasPrefix(line, dataTag) {
 				data := bytes.TrimSpace(line[5:])
-				if gjson.GetBytes(data, "type").String() == "response.completed" {
+				if streamErr, ok := parseCodexStreamTerminalError(data); ok {
+					recordAPIResponseError(ctx, e.cfg, streamErr)
+					reporter.publishFailure(ctx)
+					out <- cliproxyexecutor.StreamChunk{Err: streamErr}
+					return
+				}
+				if isCodexCompletionEventType(gjson.GetBytes(data, "type").String()) {
 					if detail, ok := parseCodexUsage(data); ok {
 						reporter.publish(ctx, detail)
 					}
@@ -683,6 +693,137 @@ func parseCodexRetryAfter(statusCode int, errorBody []byte, now time.Time) *time
 		return &retryAfter
 	}
 	return nil
+}
+
+func isCodexCompletionEventType(eventType string) bool {
+	switch strings.TrimSpace(eventType) {
+	case "response.completed", "response.done":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseCodexStreamTerminalError(payload []byte) (error, bool) {
+	payload = bytes.TrimSpace(payload)
+	if len(payload) == 0 {
+		return nil, false
+	}
+	if wsErr, ok := parseCodexWebsocketError(payload); ok {
+		return wsErr, true
+	}
+
+	eventType := strings.TrimSpace(gjson.GetBytes(payload, "type").String())
+	switch eventType {
+	case "error", "response.failed", "response.incomplete":
+	default:
+		return nil, false
+	}
+
+	statusCode := codexStreamErrorStatus(payload)
+	message := codexStreamErrorMessage(payload)
+	if statusCode == 0 {
+		statusCode = inferCodexStreamErrorStatus(message)
+	}
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
+
+	body := []byte(`{}`)
+	if node := gjson.GetBytes(payload, "error"); node.Exists() && node.Raw != "" && node.Raw != "null" {
+		body, _ = sjson.SetRawBytes(body, "error", []byte(node.Raw))
+	} else if node := gjson.GetBytes(payload, "response.error"); node.Exists() && node.Raw != "" && node.Raw != "null" {
+		body, _ = sjson.SetRawBytes(body, "error", []byte(node.Raw))
+	}
+
+	if strings.TrimSpace(gjson.GetBytes(body, "error.message").String()) == "" {
+		if strings.TrimSpace(message) == "" {
+			message = http.StatusText(statusCode)
+		}
+		body, _ = sjson.SetBytes(body, "error.message", message)
+	}
+	if strings.TrimSpace(gjson.GetBytes(body, "error.type").String()) == "" {
+		body, _ = sjson.SetBytes(body, "error.type", "server_error")
+	}
+	if strings.TrimSpace(gjson.GetBytes(body, "error.code").String()) == "" {
+		if code := codexStreamErrorCode(payload, statusCode); code != "" {
+			body, _ = sjson.SetBytes(body, "error.code", code)
+		}
+	}
+
+	return newCodexStatusErr(statusCode, body), true
+}
+
+func codexStreamErrorStatus(payload []byte) int {
+	for _, path := range []string{
+		"status",
+		"status_code",
+		"error.status",
+		"error.status_code",
+		"response.status",
+		"response.status_code",
+		"response.error.status",
+		"response.error.status_code",
+	} {
+		if status := int(gjson.GetBytes(payload, path).Int()); status > 0 {
+			return status
+		}
+	}
+	return 0
+}
+
+func codexStreamErrorMessage(payload []byte) string {
+	for _, path := range []string{
+		"error.message",
+		"message",
+		"response.error.message",
+		"response.incomplete_details.reason",
+	} {
+		if value := strings.TrimSpace(gjson.GetBytes(payload, path).String()); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func codexStreamErrorCode(payload []byte, statusCode int) string {
+	for _, path := range []string{
+		"error.code",
+		"code",
+		"response.error.code",
+	} {
+		if value := strings.TrimSpace(gjson.GetBytes(payload, path).String()); value != "" {
+			return value
+		}
+	}
+	switch statusCode {
+	case http.StatusUnauthorized:
+		return "invalid_api_key"
+	case http.StatusTooManyRequests:
+		return "rate_limit_exceeded"
+	default:
+		return "internal_server_error"
+	}
+}
+
+func inferCodexStreamErrorStatus(message string) int {
+	lower := strings.ToLower(strings.TrimSpace(message))
+	switch {
+	case strings.Contains(lower, "could not parse your authentication token"),
+		strings.Contains(lower, "please try signing in again"),
+		strings.Contains(lower, "signing in again"),
+		strings.Contains(lower, "login required"),
+		strings.Contains(lower, "login_required"),
+		strings.Contains(lower, "unauthorized"):
+		return http.StatusUnauthorized
+	case strings.Contains(lower, "rate limit"),
+		strings.Contains(lower, "too many requests"),
+		strings.Contains(lower, "usage limit"),
+		strings.Contains(lower, "quota"):
+		return http.StatusTooManyRequests
+	default:
+		return http.StatusInternalServerError
+	}
 }
 
 func codexCreds(a *cliproxyauth.Auth) (apiKey, baseURL string) {

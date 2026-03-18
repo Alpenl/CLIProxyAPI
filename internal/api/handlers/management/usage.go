@@ -24,7 +24,7 @@ type usageImportPayload struct {
 func (h *Handler) GetUsageStatistics(c *gin.Context) {
 	var snapshot usage.StatisticsSnapshot
 	if h != nil && h.usageStats != nil {
-		snapshot = h.usageStats.Snapshot()
+		snapshot = h.usageStats.SummarySnapshot()
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"usage":           snapshot,

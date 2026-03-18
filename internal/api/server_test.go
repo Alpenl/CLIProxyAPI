@@ -529,6 +529,143 @@ func TestServerRunReplenishmentOnce_ImportsStreamedAccountWithoutCreatingANewJob
 	}
 }
 
+func TestServerRunReplenishmentOnce_SkipsArchiveDownloadAfterStreamedImportWhenJobCompletes(t *testing.T) {
+	type callbackPayload struct {
+		URL   string `json:"url"`
+		Token string `json:"token"`
+	}
+	type createJobPayload struct {
+		RequestedSuccesses int              `json:"requestedSuccesses"`
+		Source             string           `json:"source"`
+		ZipRequired        bool             `json:"zipRequired"`
+		Callback           *callbackPayload `json:"callback"`
+	}
+
+	var capturedCreate createJobPayload
+	jobStatus := "running"
+	jobSuccessCount := 0
+	createCalls := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/jobs":
+			createCalls++
+			if err := json.NewDecoder(r.Body).Decode(&capturedCreate); err != nil {
+				t.Fatalf("failed to decode create payload: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"queued","requestedSuccesses":1}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"` + jobStatus + `","requestedSuccesses":1,"successCount":` + strconv.Itoa(jobSuccessCount) + `}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1/archive":
+			t.Fatalf("archive download should be skipped after streamed import already delivered all successful accounts")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer service.Close()
+
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	authDir := filepath.Join(tmpDir, "auth")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("failed to create auth dir: %v", err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to allocate callback listener: %v", err)
+	}
+	callbackPort := listener.Addr().(*net.TCPAddr).Port
+
+	cfg := &proxyconfig.Config{
+		SDKConfig: sdkconfig.SDKConfig{
+			APIKeys: []string{"test-key"},
+		},
+		Host:    "127.0.0.1",
+		Port:    callbackPort,
+		AuthDir: authDir,
+		Debug:   true,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			SecretKey: "test-management-key",
+		},
+		LoggingToFile:          false,
+		UsageStatisticsEnabled: false,
+		Replenishment: proxyconfig.ReplenishmentConfig{
+			Enabled:            true,
+			TargetAccountCount: 1,
+			ServiceURL:         service.URL,
+			ServiceToken:       "service-secret",
+		},
+	}
+
+	server := NewServer(cfg, auth.NewManager(nil, nil, nil), filepath.Join(tmpDir, "config.yaml"))
+	serveDone := make(chan error, 1)
+	go func() {
+		serveDone <- server.server.Serve(listener)
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.server.Shutdown(shutdownCtx)
+		if errServe := <-serveDone; errServe != nil && !errors.Is(errServe, http.ErrServerClosed) {
+			t.Errorf("server shutdown error = %v", errServe)
+		}
+	}()
+
+	if err = server.runReplenishmentOnce(context.Background()); err != nil {
+		t.Fatalf("first runReplenishmentOnce() error = %v", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("createCalls after first run = %d, want 1", createCalls)
+	}
+	if capturedCreate.Callback == nil {
+		t.Fatalf("callback payload = nil, want value")
+	}
+
+	callbackBody, err := json.Marshal(map[string]any{
+		"jobId":    "job-1",
+		"fileName": "codex-streamed-complete.json",
+		"account": map[string]any{
+			"type":          "codex",
+			"email":         "streamed-complete@example.com",
+			"refresh_token": "refresh-streamed-complete",
+			"access_token":  "access-streamed-complete",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode callback payload: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, capturedCreate.Callback.URL, bytes.NewReader(callbackBody))
+	if err != nil {
+		t.Fatalf("failed to create callback request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+capturedCreate.Callback.Token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("callback request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("callback status = %d, want 200, body=%s", resp.StatusCode, string(body))
+	}
+
+	jobStatus = "completed"
+	jobSuccessCount = 1
+	if err = server.runReplenishmentOnce(context.Background()); err != nil {
+		t.Fatalf("second runReplenishmentOnce() error = %v", err)
+	}
+
+	auths := server.handlers.AuthManager.List()
+	if len(auths) != 1 {
+		t.Fatalf("auth count after callback and completion = %d, want 1", len(auths))
+	}
+}
+
 func TestServerUpdateClients_StartsReplenishmentLoopWhenEnabledByReload(t *testing.T) {
 	createCalls := 0
 	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
