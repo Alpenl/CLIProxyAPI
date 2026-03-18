@@ -17,6 +17,13 @@ type CodexArchiveImportSummary struct {
 	Results  []codexOperationResult `json:"results"`
 }
 
+func (h *Handler) ImportCodexAccountBytes(ctx context.Context, sourceName string, data []byte) (codexOperationResult, error) {
+	if h == nil || h.cfg == nil {
+		return codexOperationResult{}, fmt.Errorf("handler not initialized")
+	}
+	return h.importCodexFile(ctx, sourceName, data)
+}
+
 func (h *Handler) ImportCodexArchiveBytes(ctx context.Context, archive []byte) (CodexArchiveImportSummary, error) {
 	if h == nil || h.cfg == nil {
 		return CodexArchiveImportSummary{}, fmt.Errorf("handler not initialized")

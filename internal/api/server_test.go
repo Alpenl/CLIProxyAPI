@@ -4,11 +4,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,8 +21,35 @@ import (
 	proxyconfig "github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	internallogging "github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
+	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 )
+
+type serverTestExecutor struct {
+	backendID string
+}
+
+func (e serverTestExecutor) Identifier() string { return e.backendID }
+
+func (e serverTestExecutor) Execute(ctx context.Context, authRecord *auth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+	return cliproxyexecutor.Response{Payload: []byte(`{"ok":true}`)}, nil
+}
+
+func (e serverTestExecutor) ExecuteStream(ctx context.Context, authRecord *auth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+	return nil, nil
+}
+
+func (e serverTestExecutor) Refresh(ctx context.Context, authRecord *auth.Auth) (*auth.Auth, error) {
+	return authRecord, nil
+}
+
+func (e serverTestExecutor) CountTokens(ctx context.Context, authRecord *auth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+	return cliproxyexecutor.Response{}, nil
+}
+
+func (e serverTestExecutor) HttpRequest(ctx context.Context, authRecord *auth.Auth, req *http.Request) (*http.Response, error) {
+	return nil, nil
+}
 
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
@@ -324,6 +355,177 @@ func TestServerTriggerReplenishment_RunsWhenAutoDisabled(t *testing.T) {
 	}
 	if createCalls != 1 {
 		t.Fatalf("createCalls = %d, want 1", createCalls)
+	}
+}
+
+func TestServerRunReplenishmentOnce_ImportsStreamedAccountWithoutCreatingANewJob(t *testing.T) {
+	type callbackPayload struct {
+		URL   string `json:"url"`
+		Token string `json:"token"`
+	}
+	type createJobPayload struct {
+		RequestedSuccesses int              `json:"requestedSuccesses"`
+		Source             string           `json:"source"`
+		ZipRequired        bool             `json:"zipRequired"`
+		Callback           *callbackPayload `json:"callback"`
+	}
+
+	var capturedCreate createJobPayload
+	jobSuccessCount := 0
+	createCalls := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Management-Secret"); got != "service-secret" {
+			t.Fatalf("X-Management-Secret = %q, want service-secret", got)
+		}
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/jobs":
+			createCalls++
+			if err := json.NewDecoder(r.Body).Decode(&capturedCreate); err != nil {
+				t.Fatalf("failed to decode create payload: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"queued","requestedSuccesses":2}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"running","requestedSuccesses":2,"successCount":` + strconv.Itoa(jobSuccessCount) + `}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job-1/archive":
+			t.Fatalf("archive download should not happen while job is still running")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer service.Close()
+
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	authDir := filepath.Join(tmpDir, "auth")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("failed to create auth dir: %v", err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to allocate callback listener: %v", err)
+	}
+	callbackPort := listener.Addr().(*net.TCPAddr).Port
+
+	cfg := &proxyconfig.Config{
+		SDKConfig: sdkconfig.SDKConfig{
+			APIKeys: []string{"test-key"},
+		},
+		Host:    "127.0.0.1",
+		Port:    callbackPort,
+		AuthDir: authDir,
+		Debug:   true,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			SecretKey: "test-management-key",
+		},
+		LoggingToFile:          false,
+		UsageStatisticsEnabled: false,
+		Replenishment: proxyconfig.ReplenishmentConfig{
+			Enabled:            true,
+			TargetAccountCount: 2,
+			ServiceURL:         service.URL,
+			ServiceToken:       "service-secret",
+		},
+	}
+
+	server := NewServer(cfg, auth.NewManager(nil, nil, nil), filepath.Join(tmpDir, "config.yaml"))
+	server.handlers.AuthManager.RegisterExecutor(serverTestExecutor{backendID: "codex"})
+	serveDone := make(chan error, 1)
+	go func() {
+		serveDone <- server.server.Serve(listener)
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.server.Shutdown(shutdownCtx)
+		if errServe := <-serveDone; errServe != nil && !errors.Is(errServe, http.ErrServerClosed) {
+			t.Errorf("server shutdown error = %v", errServe)
+		}
+	}()
+
+	if err := server.runReplenishmentOnce(context.Background()); err != nil {
+		t.Fatalf("first runReplenishmentOnce() error = %v", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("createCalls after first run = %d, want 1", createCalls)
+	}
+	if capturedCreate.Callback == nil {
+		t.Fatalf("callback payload = nil, want value")
+	}
+	if capturedCreate.Callback.Token != "service-secret" {
+		t.Fatalf("callback token = %q, want service-secret", capturedCreate.Callback.Token)
+	}
+	if capturedCreate.Callback.URL != "http://127.0.0.1:"+strconv.Itoa(callbackPort)+"/v0/internal/replenishment/accounts" {
+		t.Fatalf("callback URL = %q, want local callback endpoint", capturedCreate.Callback.URL)
+	}
+
+	callbackBody, err := json.Marshal(map[string]any{
+		"jobId":    "job-1",
+		"fileName": "codex-streamed.json",
+		"account": map[string]any{
+			"type":          "codex",
+			"email":         "streamed@example.com",
+			"refresh_token": "refresh-streamed",
+			"access_token":  "access-streamed",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode callback payload: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, capturedCreate.Callback.URL, bytes.NewReader(callbackBody))
+	if err != nil {
+		t.Fatalf("failed to create callback request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+capturedCreate.Callback.Token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("callback request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("callback status = %d, want 200, body=%s", resp.StatusCode, string(body))
+	}
+
+	auths := server.handlers.AuthManager.List()
+	if len(auths) != 1 {
+		t.Fatalf("auth count after callback = %d, want 1", len(auths))
+	}
+	if got := auths[0].FileName; got != "codex-streamed.json" {
+		t.Fatalf("auth file name = %q, want codex-streamed.json", got)
+	}
+	if _, err = server.handlers.AuthManager.Execute(context.Background(), cliproxyexecutor.Request{
+		Model: "gpt-5-codex-mini",
+	}, cliproxyexecutor.Options{}); err != nil {
+		t.Fatalf("execute after callback import error = %v, want nil", err)
+	}
+
+	jobSuccessCount = 1
+	if err = server.runReplenishmentOnce(context.Background()); err != nil {
+		t.Fatalf("second runReplenishmentOnce() error = %v", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("createCalls after callback import = %d, want still 1", createCalls)
+	}
+
+	status, err := server.replenishmentStatus(context.Background())
+	if err != nil {
+		t.Fatalf("replenishmentStatus() error = %v", err)
+	}
+	if status.CurrentJob == nil {
+		t.Fatalf("current job = nil, want running job")
+	}
+	if status.CurrentJob.SuccessCount != 1 {
+		t.Fatalf("current job successCount = %d, want 1", status.CurrentJob.SuccessCount)
+	}
+	if status.Deficit != 0 {
+		t.Fatalf("deficit = %d, want 0 after streamed import and reserved success", status.Deficit)
 	}
 }
 

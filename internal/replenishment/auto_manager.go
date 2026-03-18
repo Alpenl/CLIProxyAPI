@@ -22,12 +22,13 @@ type JobService interface {
 }
 
 type AutoManagerOptions struct {
-	GetConfig     func() ConfigSnapshot
-	ListAuths     func() []*coreauth.Auth
-	Client        JobService
-	ImportArchive func(context.Context, []byte) error
-	Now           func() time.Time
-	Backoff       []time.Duration
+	GetConfig           func() ConfigSnapshot
+	ListAuths           func() []*coreauth.Auth
+	Client              JobService
+	ImportArchive       func(context.Context, []byte) error
+	BuildCreateJobInput func(int) CreateJobInput
+	Now                 func() time.Time
+	Backoff             []time.Duration
 }
 
 type AutoManager struct {
@@ -35,6 +36,7 @@ type AutoManager struct {
 	listAuths     func() []*coreauth.Auth
 	client        JobService
 	importArchive func(context.Context, []byte) error
+	buildJobInput func(int) CreateJobInput
 	now           func() time.Time
 	backoff       []time.Duration
 
@@ -69,6 +71,17 @@ func NewAutoManager(options AutoManagerOptions) *AutoManager {
 		manager.listAuths = options.ListAuths
 	} else {
 		manager.listAuths = func() []*coreauth.Auth { return nil }
+	}
+	if options.BuildCreateJobInput != nil {
+		manager.buildJobInput = options.BuildCreateJobInput
+	} else {
+		manager.buildJobInput = func(requestedSuccesses int) CreateJobInput {
+			return CreateJobInput{
+				RequestedSuccesses: requestedSuccesses,
+				Source:             "auto",
+				ZipRequired:        true,
+			}
+		}
 	}
 	if options.Now != nil {
 		manager.now = options.Now
@@ -133,11 +146,7 @@ func (m *AutoManager) run(ctx context.Context, force bool) error {
 		return nil
 	}
 
-	job, err := m.client.CreateJob(ctx, CreateJobInput{
-		RequestedSuccesses: deficit,
-		Source:             "auto",
-		ZipRequired:        true,
-	})
+	job, err := m.client.CreateJob(ctx, m.buildJobInput(deficit))
 	if err != nil {
 		m.recordFailure()
 		return err

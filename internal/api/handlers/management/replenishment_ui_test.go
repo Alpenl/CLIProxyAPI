@@ -6,10 +6,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/managementui"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/replenishment"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
+	coreusage "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/usage"
 )
 
 func TestGetReplenishmentStatus_ReturnsProviderPayload(t *testing.T) {
@@ -105,6 +108,70 @@ func TestRunReplenishment_UsesTriggerCallback(t *testing.T) {
 	}
 	if got := job["id"]; got != "job-1" {
 		t.Fatalf("currentJob.id = %#v, want job-1", got)
+	}
+}
+
+func TestGetOverview_ReturnsAggregatedManagementPayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler, _, authDir := newCodexManagementTestHandler(t)
+	stats := usage.NewRequestStatistics()
+	for i := 0; i < 12; i++ {
+		stats.Record(context.Background(), coreusage.Record{
+			Provider:    "codex",
+			Model:       "gpt-5-codex",
+			APIKey:      "overview-test",
+			RequestedAt: time.Unix(int64(1700000000+i), 0).UTC(),
+			Failed:      i >= 9,
+			Detail: coreusage.Detail{
+				TotalTokens: 288,
+			},
+		})
+	}
+	handler.SetUsageStatistics(stats)
+	handler.SetReplenishmentCallbacks(
+		func(_ context.Context) (ReplenishmentStatus, error) {
+			return ReplenishmentStatus{
+				Configured:         true,
+				Enabled:            true,
+				TargetAccountCount: 10,
+				Pool: replenishment.PoolSnapshot{
+					Target:  10,
+					Healthy: 4,
+				},
+				Deficit: 6,
+			}, nil
+		},
+		nil,
+	)
+
+	codexPath := writeAuthJSONFile(t, authDir, "codex-overview.json", `{"type":"codex","email":"overview@example.com","refresh_token":"refresh-overview"}`)
+	registerAuthFile(t, handler, codexPath)
+
+	router := gin.New()
+	router.GET("/v0/management/overview", handler.GetOverview)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/management/overview", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	payload := decodeJSONBody(t, rr)
+	if _, ok := payload["accounts"].([]any); !ok {
+		t.Fatalf("expected accounts array, got %#v", payload["accounts"])
+	}
+	if usagePayload, ok := payload["usage"].(map[string]any); !ok {
+		t.Fatalf("expected usage object, got %#v", payload["usage"])
+	} else if got := int(usagePayload["total_requests"].(float64)); got != 12 {
+		t.Fatalf("usage.total_requests = %d, want 12", got)
+	}
+	if replenishmentPayload, ok := payload["replenishment"].(map[string]any); !ok {
+		t.Fatalf("expected replenishment object, got %#v", payload["replenishment"])
+	} else if got := int(replenishmentPayload["deficit"].(float64)); got != 6 {
+		t.Fatalf("replenishment.deficit = %d, want 6", got)
 	}
 }
 

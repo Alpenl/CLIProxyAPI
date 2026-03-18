@@ -43,6 +43,7 @@ func (c *Client) CreateJob(ctx context.Context, input CreateJobInput) (*Job, err
 		RequestedSuccesses: input.RequestedSuccesses,
 		Source:             strings.TrimSpace(input.Source),
 		ZipRequired:        input.ZipRequired,
+		Callback:           normalizeCallbackConfig(input.Callback),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal create job request: %w", err)
@@ -74,6 +75,23 @@ func (c *Client) CreateJob(ctx context.Context, input CreateJobInput) (*Job, err
 		return nil, fmt.Errorf("create job response missing job")
 	}
 	return payload.Job, nil
+}
+
+func normalizeCallbackConfig(input *CallbackConfig) *CallbackConfig {
+	if input == nil {
+		return nil
+	}
+
+	url := strings.TrimSpace(input.URL)
+	token := strings.TrimSpace(input.Token)
+	if url == "" || token == "" {
+		return nil
+	}
+
+	return &CallbackConfig{
+		URL:   url,
+		Token: token,
+	}
 }
 
 func (c *Client) GetJob(ctx context.Context, id string) (*Job, error) {

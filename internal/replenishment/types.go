@@ -1,15 +1,22 @@
 package replenishment
 
+type CallbackConfig struct {
+	URL   string `json:"url"`
+	Token string `json:"token"`
+}
+
 type CreateJobInput struct {
 	RequestedSuccesses int
 	Source             string
 	ZipRequired        bool
+	Callback           *CallbackConfig
 }
 
 type createJobRequest struct {
-	RequestedSuccesses int    `json:"requestedSuccesses"`
-	Source             string `json:"source"`
-	ZipRequired        bool   `json:"zipRequired"`
+	RequestedSuccesses int             `json:"requestedSuccesses"`
+	Source             string          `json:"source"`
+	ZipRequired        bool            `json:"zipRequired"`
+	Callback           *CallbackConfig `json:"callback,omitempty"`
 }
 
 type Job struct {

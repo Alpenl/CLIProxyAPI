@@ -40,6 +40,7 @@ type Handler struct {
 	configFilePath      string
 	mu                  sync.Mutex
 	attemptsMu          sync.Mutex
+	cacheMu             sync.Mutex
 	failedAttempts      map[string]*attemptInfo // keyed by client IP
 	authManager         *coreauth.Manager
 	usageStats          *usage.RequestStatistics
@@ -52,6 +53,16 @@ type Handler struct {
 	postAuthHook        coreauth.PostAuthHook
 	replenishmentStatus func(context.Context) (ReplenishmentStatus, error)
 	replenishmentRun    func(context.Context) (ReplenishmentStatus, error)
+	now                 func() time.Time
+	codexAccountsCache  codexAccountsCacheEntry
+}
+
+const codexAccountsCacheTTL = time.Second
+
+type codexAccountsCacheEntry struct {
+	entries   []gin.H
+	expiresAt time.Time
+	ready     bool
 }
 
 // NewHandler creates a new management handler instance.
@@ -68,6 +79,7 @@ func NewHandler(cfg *config.Config, configFilePath string, manager *coreauth.Man
 		tokenStore:          sdkAuth.GetTokenStore(),
 		allowRemoteOverride: envSecret != "",
 		envSecret:           envSecret,
+		now:                 time.Now,
 	}
 	h.startAttemptCleanup()
 	return h
@@ -109,10 +121,16 @@ func NewHandlerWithoutConfigFilePath(cfg *config.Config, manager *coreauth.Manag
 }
 
 // SetConfig updates the in-memory config reference when the server hot-reloads.
-func (h *Handler) SetConfig(cfg *config.Config) { h.cfg = cfg }
+func (h *Handler) SetConfig(cfg *config.Config) {
+	h.cfg = cfg
+	h.invalidateCodexAccountsCache()
+}
 
 // SetAuthManager updates the auth manager reference used by management endpoints.
-func (h *Handler) SetAuthManager(manager *coreauth.Manager) { h.authManager = manager }
+func (h *Handler) SetAuthManager(manager *coreauth.Manager) {
+	h.authManager = manager
+	h.invalidateCodexAccountsCache()
+}
 
 // SetUsageStatistics allows replacing the usage statistics reference.
 func (h *Handler) SetUsageStatistics(stats *usage.RequestStatistics) { h.usageStats = stats }
@@ -150,6 +168,91 @@ func (h *Handler) SetReplenishmentCallbacks(
 ) {
 	h.replenishmentStatus = statusFn
 	h.replenishmentRun = runFn
+}
+
+func (h *Handler) invalidateCodexAccountsCache() {
+	if h == nil {
+		return
+	}
+	h.cacheMu.Lock()
+	h.codexAccountsCache = codexAccountsCacheEntry{}
+	h.cacheMu.Unlock()
+}
+
+func (h *Handler) loadCodexAccountsCache() ([]gin.H, bool) {
+	if h == nil || h.now == nil {
+		return nil, false
+	}
+	h.cacheMu.Lock()
+	defer h.cacheMu.Unlock()
+	if !h.codexAccountsCache.ready || h.codexAccountsCache.expiresAt.IsZero() {
+		return nil, false
+	}
+	if !h.now().Before(h.codexAccountsCache.expiresAt) {
+		h.codexAccountsCache = codexAccountsCacheEntry{}
+		return nil, false
+	}
+	return cloneCodexAccountsEntries(h.codexAccountsCache.entries), true
+}
+
+func (h *Handler) storeCodexAccountsCache(entries []gin.H) {
+	if h == nil || h.now == nil {
+		return
+	}
+	h.cacheMu.Lock()
+	h.codexAccountsCache = codexAccountsCacheEntry{
+		entries:   cloneCodexAccountsEntries(entries),
+		expiresAt: h.now().Add(codexAccountsCacheTTL),
+		ready:     true,
+	}
+	h.cacheMu.Unlock()
+}
+
+func cloneCodexAccountsEntries(entries []gin.H) []gin.H {
+	if entries == nil {
+		return nil
+	}
+	cloned := make([]gin.H, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil {
+			cloned = append(cloned, nil)
+			continue
+		}
+		cloned = append(cloned, cloneGinMap(entry))
+	}
+	return cloned
+}
+
+func cloneGinMap(src gin.H) gin.H {
+	if src == nil {
+		return nil
+	}
+	dst := make(gin.H, len(src))
+	for key, value := range src {
+		dst[key] = cloneJSONLikeValue(value)
+	}
+	return dst
+}
+
+func cloneJSONLikeValue(value any) any {
+	switch typed := value.(type) {
+	case gin.H:
+		return cloneGinMap(typed)
+	case map[string]any:
+		dst := make(map[string]any, len(typed))
+		for key, nested := range typed {
+			dst[key] = cloneJSONLikeValue(nested)
+		}
+		return dst
+	case []any:
+		dst := make([]any, len(typed))
+		for i, nested := range typed {
+			dst[i] = cloneJSONLikeValue(nested)
+		}
+		return dst
+	default:
+		return value
+	}
 }
 
 // Middleware enforces access control for management endpoints.

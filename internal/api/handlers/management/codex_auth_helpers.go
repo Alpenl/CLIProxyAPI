@@ -13,6 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/auth/codex"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/watcher/synthesizer"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
@@ -99,10 +101,26 @@ func (h *Handler) buildAuthFileEntry(auth *coreauth.Auth) gin.H {
 }
 
 func extractCodexIDTokenClaims(auth *coreauth.Auth) gin.H {
-	if auth == nil || auth.Metadata == nil {
+	if auth == nil {
 		return nil
 	}
 	if !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+		return nil
+	}
+
+	result := gin.H{}
+	if auth.Attributes != nil {
+		if v := strings.TrimSpace(auth.Attributes["chatgpt_account_id"]); v != "" {
+			result["chatgpt_account_id"] = v
+		}
+		if v := strings.TrimSpace(auth.Attributes["plan_type"]); v != "" {
+			result["plan_type"] = v
+		}
+	}
+	if len(result) > 0 {
+		return result
+	}
+	if auth.Metadata == nil {
 		return nil
 	}
 	idTokenRaw, ok := auth.Metadata["id_token"].(string)
@@ -118,7 +136,7 @@ func extractCodexIDTokenClaims(auth *coreauth.Auth) gin.H {
 		return nil
 	}
 
-	result := gin.H{}
+	result = gin.H{}
 	if v := strings.TrimSpace(claims.CodexAuthInfo.ChatgptAccountID); v != "" {
 		result["chatgpt_account_id"] = v
 	}
@@ -268,68 +286,295 @@ func (h *Handler) authIDForPath(path string) string {
 	return id
 }
 
+func populateAuthDerivedAttributes(authType string, metadata map[string]any, attr map[string]string) {
+	if attr == nil {
+		return
+	}
+	if email := stringMetadata(metadata, "email"); email != "" {
+		attr["email"] = email
+		attr["account_email"] = email
+	}
+	if !strings.EqualFold(strings.TrimSpace(authType), "codex") {
+		return
+	}
+	idTokenRaw, _ := metadata["id_token"].(string)
+	idToken := strings.TrimSpace(idTokenRaw)
+	if idToken == "" {
+		return
+	}
+	claims, err := codex.ParseJWTToken(idToken)
+	if err != nil || claims == nil {
+		return
+	}
+	if v := strings.TrimSpace(claims.CodexAuthInfo.ChatgptAccountID); v != "" {
+		attr["chatgpt_account_id"] = v
+	}
+	if v := strings.TrimSpace(claims.CodexAuthInfo.ChatgptPlanType); v != "" {
+		attr["plan_type"] = v
+	}
+}
+
 func (h *Handler) registerAuthFromFile(ctx context.Context, path string, data []byte) error {
+	if h == nil {
+		return fmt.Errorf("handler not initialized")
+	}
 	if h.authManager == nil {
+		h.invalidateCodexAccountsCache()
 		return nil
 	}
 	if path == "" {
 		return fmt.Errorf("auth path is empty")
 	}
+	var err error
 	if data == nil {
-		var err error
 		data, err = os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("failed to read auth file: %w", err)
 		}
 	}
-	metadata := make(map[string]any)
-	if err := json.Unmarshal(data, &metadata); err != nil {
-		return fmt.Errorf("invalid auth file: %w", err)
+	var auth *coreauth.Auth
+	auth, err = h.synthesizeManagedAuth(path, data)
+	if err != nil {
+		return err
 	}
-	authType, _ := metadata["type"].(string)
-	if authType == "" {
-		authType = "unknown"
-	}
-	label := authType
-	if email, ok := metadata["email"].(string); ok && email != "" {
-		label = email
-	}
-	lastRefresh, hasLastRefresh := extractLastRefreshTimestamp(metadata)
-
-	authID := h.authIDForPath(path)
-	if authID == "" {
-		authID = path
-	}
-	attr := map[string]string{
-		"path":   path,
-		"source": path,
-	}
-	auth := &coreauth.Auth{
-		ID:         authID,
-		Provider:   authType,
-		FileName:   filepath.Base(path),
-		Label:      label,
-		Status:     coreauth.StatusActive,
-		Attributes: attr,
-		Metadata:   metadata,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
-	}
-	if hasLastRefresh {
-		auth.LastRefreshedAt = lastRefresh
-	}
-	if existing, ok := h.authManager.GetByID(authID); ok {
+	if existing, ok := h.authManager.GetByID(auth.ID); ok {
 		auth.CreatedAt = existing.CreatedAt
-		if !hasLastRefresh {
+		if auth.LastRefreshedAt.IsZero() {
 			auth.LastRefreshedAt = existing.LastRefreshedAt
 		}
 		auth.NextRefreshAfter = existing.NextRefreshAfter
 		auth.Runtime = existing.Runtime
-		_, err := h.authManager.Update(ctx, auth)
+		_, err = h.authManager.Update(ctx, auth)
+		if err == nil {
+			h.invalidateCodexAccountsCache()
+			h.syncManagedAuthRuntime(auth)
+		}
 		return err
 	}
-	_, err := h.authManager.Register(ctx, auth)
+	_, err = h.authManager.Register(ctx, auth)
+	if err == nil {
+		h.invalidateCodexAccountsCache()
+		h.syncManagedAuthRuntime(auth)
+	}
 	return err
+}
+
+func (h *Handler) synthesizeManagedAuth(path string, data []byte) (*coreauth.Auth, error) {
+	if h == nil || h.cfg == nil {
+		return nil, fmt.Errorf("handler not initialized")
+	}
+	metadata := make(map[string]any)
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, fmt.Errorf("invalid auth file: %w", err)
+	}
+	authType, _ := metadata["type"].(string)
+	if !strings.EqualFold(strings.TrimSpace(authType), "codex") {
+		label := authType
+		if email, ok := metadata["email"].(string); ok && email != "" {
+			label = email
+		}
+		auth := &coreauth.Auth{
+			ID:       h.authIDForPath(path),
+			Provider: authType,
+			FileName: filepath.Base(path),
+			Label:    label,
+			Status:   coreauth.StatusActive,
+			Attributes: map[string]string{
+				"path":   path,
+				"source": path,
+			},
+			Metadata:  metadata,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		populateAuthDerivedAttributes(authType, metadata, auth.Attributes)
+		if lastRefresh, ok := extractLastRefreshTimestamp(metadata); ok {
+			auth.LastRefreshedAt = lastRefresh
+		}
+		return auth, nil
+	}
+
+	sctx := &synthesizer.SynthesisContext{
+		Config:      h.cfg,
+		AuthDir:     strings.TrimSpace(h.cfg.AuthDir),
+		Now:         time.Now(),
+		IDGenerator: synthesizer.NewStableIDGenerator(),
+	}
+	generated := synthesizer.SynthesizeAuthFile(sctx, path, data)
+	if len(generated) == 0 || generated[0] == nil {
+		return nil, fmt.Errorf("invalid auth file: unsupported auth payload")
+	}
+	auth := generated[0].Clone()
+	auth.FileName = filepath.Base(path)
+	if auth.Attributes == nil {
+		auth.Attributes = make(map[string]string)
+	}
+	populateAuthDerivedAttributes(auth.Provider, auth.Metadata, auth.Attributes)
+	if email := authEmail(auth); email != "" {
+		auth.Attributes["email"] = email
+		auth.Attributes["account_email"] = email
+	}
+	if lastRefresh, ok := extractLastRefreshTimestamp(auth.Metadata); ok {
+		auth.LastRefreshedAt = lastRefresh
+	}
+	return auth, nil
+}
+
+func (h *Handler) syncManagedAuthRuntime(auth *coreauth.Auth) {
+	if h == nil || h.authManager == nil || auth == nil || strings.TrimSpace(auth.ID) == "" {
+		return
+	}
+	registerManagedAuthModels(auth)
+	h.authManager.RefreshSchedulerEntry(auth.ID)
+}
+
+func registerManagedAuthModels(auth *coreauth.Auth) {
+	if auth == nil || strings.TrimSpace(auth.ID) == "" {
+		return
+	}
+	if auth.Disabled || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+		registry.GetGlobalRegistry().UnregisterClient(auth.ID)
+		return
+	}
+
+	var excluded []string
+	if auth.Attributes != nil {
+		if raw := strings.TrimSpace(auth.Attributes["excluded_models"]); raw != "" {
+			excluded = strings.Split(raw, ",")
+		}
+	}
+
+	planType := ""
+	if auth.Attributes != nil {
+		planType = strings.TrimSpace(auth.Attributes["plan_type"])
+	}
+
+	var models []*registry.ModelInfo
+	switch strings.ToLower(planType) {
+	case "free":
+		models = registry.GetCodexFreeModels()
+	case "team":
+		models = registry.GetCodexTeamModels()
+	case "plus":
+		models = registry.GetCodexPlusModels()
+	default:
+		models = registry.GetCodexProModels()
+	}
+
+	models = filterManagedModels(models, excluded)
+	models = prefixManagedModels(models, auth.Prefix)
+	if len(models) == 0 {
+		registry.GetGlobalRegistry().UnregisterClient(auth.ID)
+		return
+	}
+	registry.GetGlobalRegistry().RegisterClient(auth.ID, models)
+}
+
+func filterManagedModels(models []*registry.ModelInfo, excluded []string) []*registry.ModelInfo {
+	if len(models) == 0 || len(excluded) == 0 {
+		return models
+	}
+	patterns := make([]string, 0, len(excluded))
+	for _, item := range excluded {
+		if trimmed := strings.ToLower(strings.TrimSpace(item)); trimmed != "" {
+			patterns = append(patterns, trimmed)
+		}
+	}
+	if len(patterns) == 0 {
+		return models
+	}
+	filtered := make([]*registry.ModelInfo, 0, len(models))
+	for _, model := range models {
+		if model == nil {
+			continue
+		}
+		modelID := strings.ToLower(strings.TrimSpace(model.ID))
+		blocked := false
+		for _, pattern := range patterns {
+			if managedModelWildcardMatch(pattern, modelID) {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			filtered = append(filtered, model)
+		}
+	}
+	return filtered
+}
+
+func prefixManagedModels(models []*registry.ModelInfo, prefix string) []*registry.ModelInfo {
+	trimmedPrefix := strings.TrimSpace(prefix)
+	if trimmedPrefix == "" || len(models) == 0 {
+		return models
+	}
+
+	out := make([]*registry.ModelInfo, 0, len(models)*2)
+	seen := make(map[string]struct{}, len(models)*2)
+	addModel := func(model *registry.ModelInfo) {
+		if model == nil {
+			return
+		}
+		id := strings.TrimSpace(model.ID)
+		if id == "" {
+			return
+		}
+		if _, exists := seen[id]; exists {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, model)
+	}
+
+	for _, model := range models {
+		if model == nil {
+			continue
+		}
+		baseID := strings.TrimSpace(model.ID)
+		if baseID == "" {
+			continue
+		}
+		addModel(model)
+		clone := *model
+		clone.ID = trimmedPrefix + "/" + baseID
+		addModel(&clone)
+	}
+	return out
+}
+
+func managedModelWildcardMatch(pattern, value string) bool {
+	if pattern == "" {
+		return false
+	}
+	if !strings.Contains(pattern, "*") {
+		return pattern == value
+	}
+
+	parts := strings.Split(pattern, "*")
+	if prefix := parts[0]; prefix != "" {
+		if !strings.HasPrefix(value, prefix) {
+			return false
+		}
+		value = value[len(prefix):]
+	}
+	if suffix := parts[len(parts)-1]; suffix != "" {
+		if !strings.HasSuffix(value, suffix) {
+			return false
+		}
+		value = value[:len(value)-len(suffix)]
+	}
+	for i := 1; i < len(parts)-1; i++ {
+		segment := parts[i]
+		if segment == "" {
+			continue
+		}
+		idx := strings.Index(value, segment)
+		if idx < 0 {
+			return false
+		}
+		value = value[idx+len(segment):]
+	}
+	return true
 }
 
 func (h *Handler) deleteTokenRecord(ctx context.Context, path string) error {

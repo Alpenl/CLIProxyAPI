@@ -275,26 +275,34 @@ func (h *Handler) listCodexAccountEntries() []gin.H {
 	if h == nil || h.cfg == nil {
 		return nil
 	}
+	if cached, ok := h.loadCodexAccountsCache(); ok {
+		return cached
+	}
+
+	var accounts []gin.H
 	if h.authManager == nil {
-		return h.listCodexAccountsFromDisk()
-	}
-	auths := h.authManager.List()
-	accounts := make([]gin.H, 0, len(auths))
-	for _, auth := range auths {
-		if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
-			continue
+		accounts = h.listCodexAccountsFromDisk()
+	} else {
+		auths := h.authManager.List()
+		accounts = make([]gin.H, 0, len(auths))
+		for _, auth := range auths {
+			if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+				continue
+			}
+			entry := h.buildAuthFileEntry(auth)
+			if entry == nil {
+				continue
+			}
+			accounts = append(accounts, entry)
 		}
-		entry := h.buildAuthFileEntry(auth)
-		if entry == nil {
-			continue
-		}
-		accounts = append(accounts, entry)
+		sort.Slice(accounts, func(i, j int) bool {
+			nameI, _ := accounts[i]["name"].(string)
+			nameJ, _ := accounts[j]["name"].(string)
+			return strings.ToLower(nameI) < strings.ToLower(nameJ)
+		})
 	}
-	sort.Slice(accounts, func(i, j int) bool {
-		nameI, _ := accounts[i]["name"].(string)
-		nameJ, _ := accounts[j]["name"].(string)
-		return strings.ToLower(nameI) < strings.ToLower(nameJ)
-	})
+
+	h.storeCodexAccountsCache(accounts)
 	return accounts
 }
 
@@ -589,6 +597,7 @@ func (h *Handler) deleteCodexAccount(ctx context.Context, name string) error {
 	if err := os.Remove(targetPath); err != nil {
 		return err
 	}
+	h.invalidateCodexAccountsCache()
 	if err := h.deleteTokenRecord(ctx, targetPath); err != nil {
 		return err
 	}
@@ -602,11 +611,16 @@ func (h *Handler) deleteCodexAccount(ctx context.Context, name string) error {
 
 func (h *Handler) removeCodexAuth(ctx context.Context, auth *coreauth.Auth, path string) error {
 	path = strings.TrimSpace(path)
+	removedFromDisk := false
 	if path != "" {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return err
 		}
+		removedFromDisk = true
 		_ = h.deleteTokenRecord(ctx, path)
+	}
+	if removedFromDisk {
+		h.invalidateCodexAccountsCache()
 	}
 	if auth != nil {
 		h.removeAuthRuntime(auth.ID)
@@ -619,7 +633,11 @@ func (h *Handler) removeCodexAuth(ctx context.Context, auth *coreauth.Auth, path
 }
 
 func (h *Handler) removeAuthRuntime(id string) {
-	if h == nil || h.authManager == nil {
+	if h == nil {
+		return
+	}
+	h.invalidateCodexAccountsCache()
+	if h.authManager == nil {
 		return
 	}
 	h.authManager.Remove(id)

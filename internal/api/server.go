@@ -147,6 +147,8 @@ type Server struct {
 	replenishmentManager any
 	replenishmentStop    chan struct{}
 	replenishmentDone    chan struct{}
+	callbackBaseURLMu    sync.RWMutex
+	callbackBaseURL      string
 }
 
 // NewServer creates and initializes a new API server instance.
@@ -217,6 +219,10 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, configFilePath str
 		currentPath:         wd,
 		envManagementSecret: envManagementSecret,
 	}
+	engine.Use(func(c *gin.Context) {
+		s.rememberObservedCallbackBaseURL(c.Request)
+		c.Next()
+	})
 	// Save initial YAML snapshot
 	s.oldConfigYaml, _ = yaml.Marshal(cfg)
 	if authManager != nil {
@@ -303,9 +309,15 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PUT("/bootstrap/config", s.mgmt.UpdateBootstrapConfig)
 	}
 
+	internal := s.engine.Group("/v0/internal/replenishment")
+	{
+		internal.POST("/accounts", s.handleReplenishmentAccountCallback)
+	}
+
 	protected := mgmt.Group("")
 	protected.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
 	{
+		protected.GET("/overview", s.mgmt.GetOverview)
 		protected.GET("/usage", s.mgmt.GetUsageStatistics)
 		protected.GET("/config", s.mgmt.GetWebConfig)
 		protected.PUT("/config", s.mgmt.UpdateWebConfig)

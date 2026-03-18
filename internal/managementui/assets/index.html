@@ -2598,26 +2598,20 @@
 
         setBusy(true);
         try {
-          const [accountsPayload, usagePayload, replenishmentPayload] = await Promise.all([
-            api("/v0/management/codex/accounts"),
-            api("/v0/management/usage"),
-            api("/v0/management/replenishment/status").catch((error) => ({ __error: error })),
-          ]);
+          const payload = await api("/v0/management/overview");
 
-          state.accounts = accountsPayload.accounts || [];
-          state.usage = usagePayload;
-          if (replenishmentPayload && replenishmentPayload.__error) {
-            state.replenishmentStatus = null;
-            state.replenishmentError = replenishmentPayload.__error.message || "补号状态读取失败";
-          } else {
-            state.replenishmentStatus = replenishmentPayload && replenishmentPayload.replenishment ? replenishmentPayload.replenishment : null;
-            state.replenishmentError = "";
-          }
+          state.accounts = payload.accounts || [];
+          state.usage = {
+            usage: payload.usage || null,
+            failed_requests: Number(payload.failed_requests || 0),
+          };
+          state.replenishmentStatus = payload.replenishment || null;
+          state.replenishmentError = payload.replenishment_error || "";
           state.replenishmentLoading = false;
           state.lastSync = new Date().toISOString();
           syncQuotaCache();
           renderApp();
-          addLog(`已刷新概览：账号 ${state.accounts.length} 个，请求 ${usagePayload.usage ? usagePayload.usage.total_requests : 0} 次`);
+          addLog(`已刷新概览：账号 ${state.accounts.length} 个，请求 ${payload.usage ? payload.usage.total_requests : 0} 次`);
         } catch (error) {
           renderApp();
           if (!options.silentError) {
@@ -2976,13 +2970,16 @@
       }
 
       function syncQuotaAutoRefresh(route) {
-        if (!state.authenticated || route !== "quota") {
+        if (!state.authenticated || route !== "quota" || document.hidden) {
           clearQuotaAutoRefresh();
           return;
         }
 
         if (!state.quotaAutoRefreshHandle) {
           state.quotaAutoRefreshHandle = window.setInterval(() => {
+            if (document.hidden) {
+              return;
+            }
             refreshQuotaCollection({ onlyStale: true, silentLog: true });
           }, QUOTA_AUTO_REFRESH_INTERVAL_MS);
         }
@@ -4273,6 +4270,14 @@
 
       window.addEventListener("hashchange", () => {
         elements.body.classList.remove("nav-open");
+        renderApp();
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          syncQuotaAutoRefresh("");
+          return;
+        }
         renderApp();
       });
 

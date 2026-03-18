@@ -211,6 +211,59 @@ func TestCodexManagementImportFiles_ImportsUploadedCodexFiles(t *testing.T) {
 	}
 }
 
+func TestListCodexAccountsUsesShortTTLCache(t *testing.T) {
+	handler, _, authDir := newCodexManagementTestHandler(t)
+
+	authPath := writeAuthJSONFile(t, authDir, "codex-cache.json", `{"type":"codex","email":"cache@example.com","refresh_token":"refresh-cache"}`)
+	registerAuthFile(t, handler, authPath)
+
+	router := newCodexManagementRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/management/codex/accounts", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want %d: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+
+	firstPayload := decodeJSONBody(t, rr)
+	firstAccounts, ok := firstPayload["accounts"].([]any)
+	if !ok || len(firstAccounts) != 1 {
+		t.Fatalf("expected first accounts payload with one entry, got %#v", firstPayload["accounts"])
+	}
+	firstAccount, ok := firstAccounts[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first account object, got %#v", firstAccounts[0])
+	}
+	firstSize := int(firstAccount["size"].(float64))
+
+	if err := os.WriteFile(authPath, []byte(`{"type":"codex","email":"cache@example.com","refresh_token":"refresh-cache","access_token":"expanded-access-token"}`), 0o600); err != nil {
+		t.Fatalf("failed to mutate auth file: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v0/management/codex/accounts", nil)
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("second request status = %d, want %d: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+
+	secondPayload := decodeJSONBody(t, rr)
+	secondAccounts, ok := secondPayload["accounts"].([]any)
+	if !ok || len(secondAccounts) != 1 {
+		t.Fatalf("expected second accounts payload with one entry, got %#v", secondPayload["accounts"])
+	}
+	secondAccount, ok := secondAccounts[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected second account object, got %#v", secondAccounts[0])
+	}
+	secondSize := int(secondAccount["size"].(float64))
+
+	if secondSize != firstSize {
+		t.Fatalf("expected cached size %d on immediate second request, got %d", firstSize, secondSize)
+	}
+}
+
 func TestCodexManagementCleanupInvalid_RemovesBrokenAccounts(t *testing.T) {
 	handler, manager, authDir := newCodexManagementTestHandler(t)
 

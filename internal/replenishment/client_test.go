@@ -39,6 +39,10 @@ func TestClientCreateJob_SendsAuthAndPayload(t *testing.T) {
 		RequestedSuccesses: 3,
 		Source:             "auto",
 		ZipRequired:        true,
+		Callback: &CallbackConfig{
+			URL:   "http://127.0.0.1:9090/v0/internal/replenishment/accounts",
+			Token: "callback-secret",
+		},
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() error = %v", err)
@@ -49,6 +53,15 @@ func TestClientCreateJob_SendsAuthAndPayload(t *testing.T) {
 	}
 	if capturedPayload.RequestedSuccesses != 3 {
 		t.Fatalf("requestedSuccesses = %d, want 3", capturedPayload.RequestedSuccesses)
+	}
+	if capturedPayload.Callback == nil {
+		t.Fatalf("callback = nil, want value")
+	}
+	if capturedPayload.Callback.URL != "http://127.0.0.1:9090/v0/internal/replenishment/accounts" {
+		t.Fatalf("callback.url = %q, want callback url", capturedPayload.Callback.URL)
+	}
+	if capturedPayload.Callback.Token != "callback-secret" {
+		t.Fatalf("callback.token = %q, want callback-secret", capturedPayload.Callback.Token)
 	}
 	if job.ID != "job-1" {
 		t.Fatalf("job.ID = %q, want job-1", job.ID)
